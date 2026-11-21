@@ -157,11 +157,13 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 
 - 确认方式：客户端日志 `used to establish WebRTC connection`（中继则为 `WebSocket`）；`e2e_windows.py` 自动检查。
   实测（同一对客户端、各 10 秒）：P2P 时服务器端口仅 2 KB，关闭 WebRTC 走中继时 555 KB。
+  Android 模拟器（新版 APK）双向实测：电脑控手机、手机控电脑均走 P2P，服务器端口 1–2 KB / 10 秒。
 - 打不通的情况（自动退回中继，功能不受影响）：双方都在对称型 NAT 后（部分 4G/5G、严格的公司防火墙）、
   网络禁止 UDP、本机开了 SOCKS 代理，或 UDP 经 TUN 代理（Clash 等）出网。没有 TURN 服务器（NAT 虚拟机无法映射
   UDP），这些情况只能中继。
 - Android 端（模拟器实测）只上报 STUN 得到的公网候选、不上报本机网卡地址，所以手机与电脑在同一局域网时，
   直连依赖路由器支持回环（hairpin），不支持则走中继。
+- 刚断开就立即重连（几秒内）时偶尔走中继（上一个 P2P 会话还在收尾），会话照常可用。
 - 信令走 `ws://`（服务器无域名证书，无 TLS），SDP/ICE 候选（含内网 IP）在客户端与服务器之间不加密；
   会话本身由 DTLS 加密，且与服务器签名的对端身份绑定。
 - 可选：若服务商能把 **TCP 21115-21117 + UDP 21116** 按相同端口号映射，可跑 `check-p2p-ports.py` 确认后在
