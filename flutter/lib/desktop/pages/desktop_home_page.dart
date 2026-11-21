@@ -16,6 +16,8 @@ import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/superdesk/desktop_home.dart';
+import 'package:flutter_hbb/superdesk/superdesk.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:flutter_hbb/utils/platform_channel.dart';
 import 'package:get/get.dart';
@@ -59,6 +61,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    if (!isIncomingOnly && !bind.isOutgoingOnly()) {
+      // super远程桌面: new main-window layout; this state keeps all the logic.
+      return _buildBlock(
+          child: SuperdeskDesktopHome(
+              helpCards: Column(children: [
+        buildPresetPasswordWarning(),
+        Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+      ])));
+    }
     return _buildBlock(
         child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,9 +100,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         alignment: Alignment.center,
         child: loadLogo(),
       ),
-      buildTip(context),
-      if (!isOutgoingOnly) buildIDBoard(context),
-      if (!isOutgoingOnly) buildPasswordBoard(context),
+      if (!isIncomingOnly) buildTip(context),
+      if (!isOutgoingOnly && !isIncomingOnly) buildIDBoard(context),
+      if (!isOutgoingOnly && !isIncomingOnly) buildPasswordBoard(context),
+      if (isIncomingOnly) sdIncomingDeviceCard(context),
+      if (isIncomingOnly) superdeskHelperPanel(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -130,7 +143,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       value: gFFI.serverModel,
       child: Container(
         width: isIncomingOnly ? 280.0 : 200.0,
-        color: Theme.of(context).colorScheme.background,
+        color: isIncomingOnly
+            ? SdPalette(context).page
+            : Theme.of(context).colorScheme.background,
         child: Stack(
           children: [
             Column(
@@ -428,6 +443,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildHelpCards(String updateUrl) {
+    final sdUpdate = superdeskUpdate.value;
+    if (sdUpdate != null && !isCardClosed) {
+      return buildInstallCard(
+          "Status",
+          "发现新版本 ${sdUpdate.version}（${sdUpdate.build}）${sdUpdate.notes.isEmpty ? '' : '：${sdUpdate.notes}'}",
+          "下载更新",
+          () => superdeskOpenUpdate(sdUpdate),
+          closeButton: true);
+    }
     if (!bind.isCustomClient() &&
         updateUrl.isNotEmpty &&
         !isCardClosed &&
@@ -601,6 +625,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     }
 
+    if (!bind.isOutgoingOnly()) {
+      // super远程桌面: same card logic, banner look matching the new main window.
+      return sdBanner(context,
+          title: title.isEmpty ? '' : translate(title),
+          content: content.isEmpty ? '' : translate(content),
+          button: btnText.isEmpty ? null : translate(btnText),
+          onPressed: onPressed,
+          onClose: (closeButton ?? false) ? closeCard : null,
+          help: help == null ? null : translate(help),
+          link: link);
+    }
     return Stack(
       children: [
         Container(
@@ -699,6 +734,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   @override
   void initState() {
     super.initState();
+    superdeskCheckUpdate();
     _updateTimer = periodic_immediate(const Duration(seconds: 1), () async {
       await gFFI.serverModel.fetchID();
       final error = await bind.mainGetError();

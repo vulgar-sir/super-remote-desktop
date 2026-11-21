@@ -1,0 +1,36 @@
+{
+  "full": {
+    "app_name": "SuperDesk",
+    "display_name": "super远程桌面",
+    "description": "IT/管理员用的完整客户端：可控制别人，也可被控",
+    "client_config": {
+      "default-settings": {
+        "image_quality": "balanced",
+        "custom-fps": "25",
+        "codec-preference": "auto",
+        "allow-numeric-one-time-password": "Y",
+        "temporary-password-length": "6"
+      }
+    }
+  },
+  "helper": {
+    "app_name": "SuperDeskHelper",
+    "display_name": "super远程助手",
+    "description": "员工用的被控端：只显示 ID/密码，可一键求助，不能控制别人",
+    "client_config": {
+      "conn-type": "incoming",
+      "override-settings": {
+        "hide-server-settings": "Y",
+        "hide-network-settings": "Y",
+        "hide-proxy-settings": "Y",
+        "hide-websocket-settings": "Y",
+        "hide-security-settings": "Y",
+        "hide-remote-printer-settings": "Y"
+      },
+      "default-settings": {
+        "allow-numeric-one-time-password": "Y",
+        "temporary-password-length": "6"
+      }
+    }
+  }
+}

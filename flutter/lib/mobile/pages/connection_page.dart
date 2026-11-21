@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:auto_size_text_field/auto_size_text_field.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/superdesk/theme.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -148,16 +149,32 @@ class _ConnectionPageState extends State<ConnectionPage> {
   /// UI for the remote ID TextField.
   /// Search for a peer and connect to it if the id exists.
   Widget _buildRemoteIDTextField() {
-    final w = SizedBox(
-      height: 84,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.all(Radius.circular(13)),
-          ),
-          child: Row(
+    // super远程桌面: "control a partner device" card (input logic unchanged).
+    final p = SdPalette(context);
+    final w = Padding(
+      padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: p.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: p.line),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.connected_tv_rounded, color: kSdAccent, size: 18),
+                const SizedBox(width: 8),
+                Text('远程控制伙伴设备',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: p.text)),
+              ]),
+              const SizedBox(height: 10),
+              Container(
+                height: 64,
+                decoration: BoxDecoration(color: p.field, borderRadius: BorderRadius.circular(12)),
+                child: Row(
             children: <Widget>[
               Expanded(
                 child: Container(
@@ -237,7 +254,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           color: MyTheme.idColor,
                         ),
                         decoration: InputDecoration(
-                          labelText: translate('Remote ID'),
+                          labelText: '伙伴的设备代码',
                           // hintText: 'Enter your remote ID',
                           border: InputBorder.none,
                           helperStyle: const TextStyle(
@@ -334,13 +351,22 @@ class _ConnectionPageState extends State<ConnectionPage> {
                         },
                         icon: Icon(Icons.clear, color: MyTheme.darkGray)),
                   )),
+            ],
+          ),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
-                width: 60,
-                height: 60,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_forward,
-                      color: MyTheme.darkGray, size: 45),
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
                   onPressed: onConnect,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kSdAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('远程控制', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],

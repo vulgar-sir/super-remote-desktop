@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/superdesk/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
@@ -455,6 +456,8 @@ class ScamWarningDialogState extends State<ScamWarningDialog> {
   }
 }
 
+final _sdShowCode = false.obs;
+
 class ServerInfo extends StatelessWidget {
   final model = gFFI.serverModel;
   final emptyController = TextEditingController(text: "-");
@@ -469,10 +472,6 @@ class ServerInfo extends StatelessWidget {
     const Color colorNegative = Colors.red;
     const double iconMarginRight = 15;
     const double iconSize = 24;
-    const TextStyle textStyleHeading = TextStyle(
-        fontSize: 16.0, fontWeight: FontWeight.bold, color: Colors.grey);
-    const TextStyle textStyleValue =
-        TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold);
 
     void copyToClipboard(String value) {
       Clipboard.setData(ClipboardData(text: value));
@@ -504,65 +503,55 @@ class ServerInfo extends StatelessWidget {
 
     final showOneTime = serverModel.approveMode != 'click' &&
         serverModel.verificationMethod != kUsePermanentPassword;
-    return PaddingCard(
-        title: translate('Your Device'),
-        child: Column(
-          // ID
-          children: [
-            Row(children: [
-              const Icon(Icons.perm_identity,
-                      color: Colors.grey, size: iconSize)
-                  .marginOnly(right: iconMarginRight),
-              Text(
-                translate('ID'),
-                style: textStyleHeading,
-              )
-            ]),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(
-                model.serverId.value.text,
-                style: textStyleValue,
-              ),
-              IconButton(
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(Icons.copy_outlined),
-                  onPressed: () {
-                    copyToClipboard(model.serverId.value.text.trim());
-                  })
-            ]).marginOnly(left: 39, bottom: 10),
-            // Password
-            Row(children: [
-              const Icon(Icons.lock_outline, color: Colors.grey, size: iconSize)
-                  .marginOnly(right: iconMarginRight),
-              Text(
-                translate('One-time Password'),
-                style: textStyleHeading,
-              )
-            ]),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(
-                !showOneTime ? '-' : model.serverPasswd.value.text,
-                style: textStyleValue,
-              ),
-              !showOneTime
-                  ? SizedBox.shrink()
-                  : Row(children: [
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.refresh),
-                          onPressed: () => bind.mainUpdateTemporaryPassword()),
-                      IconButton(
-                          visualDensity: VisualDensity.compact,
-                          icon: Icon(Icons.copy_outlined),
-                          onPressed: () {
-                            copyToClipboard(
-                                model.serverPasswd.value.text.trim());
-                          })
-                    ])
-            ]).marginOnly(left: 40, bottom: 15),
-            ConnectionStateNotification()
-          ],
-        ));
+    // super远程桌面: device code / verification code card.
+    final p = SdPalette(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: sdCard(p,
+          padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.phone_android_rounded, color: kSdAccent, size: 18),
+                const SizedBox(width: 8),
+                Text('本机设备',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: p.text)),
+              ]),
+              const SizedBox(height: 12),
+              sdCodeField(p, label: '设备代码', value: model.serverId.value.text, size: 28, actions: [
+                sdIconButton(p, Icons.copy_rounded, '复制设备代码',
+                    () => copyToClipboard(model.serverId.value.text.replaceAll(' ', ''))),
+              ]),
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 10, 10, 10),
+                  child: Divider(height: 1, color: p.line)),
+              if (showOneTime)
+                Obx(() => sdCodeField(p,
+                        label: '验证码',
+                        size: 28,
+                        value: _sdShowCode.value ? model.serverPasswd.value.text : '••••••',
+                        actions: [
+                          sdIconButton(
+                              p,
+                              _sdShowCode.value ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                              _sdShowCode.value ? '隐藏验证码' : '显示验证码',
+                              () => _sdShowCode.toggle()),
+                          sdIconButton(p, Icons.copy_rounded, '复制验证码',
+                              () => copyToClipboard(model.serverPasswd.value.text.trim())),
+                          sdIconButton(p, Icons.refresh_rounded, '更换验证码',
+                              () => bind.mainUpdateTemporaryPassword()),
+                        ]))
+              else
+                sdCodeField(p,
+                    label: '验证方式',
+                    size: 17,
+                    value: serverModel.approveMode == 'click' ? '需在本机点击“接受”' : '已设置固定密码'),
+              const SizedBox(height: 14),
+              Padding(padding: const EdgeInsets.only(right: 10), child: ConnectionStateNotification()),
+            ],
+          )),
+    );
   }
 }
 
@@ -885,8 +874,12 @@ class PaddingCard extends StatelessWidget {
     return SizedBox(
         width: double.maxFinite,
         child: Card(
+          // super远程桌面: same card look as the rest of the redesigned UI
+          color: SdPalette(context).card,
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: SdPalette(context).line),
           ),
           margin: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
           child: Padding(

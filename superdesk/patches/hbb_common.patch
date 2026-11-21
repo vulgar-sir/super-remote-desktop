@@ -1,0 +1,48 @@
+diff --git a/src/config.rs b/src/config.rs
+index 9ee5cac..32eddab 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -68,7 +68,7 @@ lazy_static::lazy_static! {
+     static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
+     pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("".to_owned());
+     pub static ref EXE_RENDEZVOUS_SERVER: RwLock<String> = Default::default();
+-    pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());
++    pub static ref APP_NAME: RwLock<String> = RwLock::new(option_env!("SUPERDESK_APP_NAME").unwrap_or("RustDesk").to_owned());
+     static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
+     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
+     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
+@@ -113,8 +113,15 @@ const CHARS: &[char] = &[
+     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+ ];
+ 
+-pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
+-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
++// super远程桌面: server/key are injected at build time (superdesk/scripts), never committed.
++pub const RENDEZVOUS_SERVERS: &[&str] = &[match option_env!("SUPERDESK_RENDEZVOUS_SERVER") {
++    Some(s) => s,
++    None => "rs-ny.rustdesk.com",
++}];
++pub const RS_PUB_KEY: &str = match option_env!("SUPERDESK_RS_PUB_KEY") {
++    Some(s) => s,
++    None => "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=",
++};
+ 
+ pub const RENDEZVOUS_PORT: i32 = 21116;
+ pub const RELAY_PORT: i32 = 21117;
+diff --git a/src/websocket.rs b/src/websocket.rs
+index 3a98a84..566a19d 100644
+--- a/src/websocket.rs
++++ b/src/websocket.rs
+@@ -511,7 +511,11 @@ pub fn check_ws(endpoint: &str) -> String {
+         (true, endpoint_port + 2)
+     };
+ 
+-    let (address, is_domain) = if crate::is_ip_str(endpoint) {
++    // super远程桌面: an own server on a bare IP with `websocket-port` set also goes through the
++    // single-port /ws/id + /ws/relay reverse proxy, like a domain does.
++    let (address, is_domain) = if crate::is_ip_str(endpoint)
++        && websocket_port(&endpoint_host, &relay_server).is_none()
++    {
+         (format!("{}:{}", endpoint_host, dst_port), false)
+     } else {
+         let domain_path = if relay { "/ws/relay" } else { "/ws/id" };

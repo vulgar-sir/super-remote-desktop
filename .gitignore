@@ -60,3 +60,9 @@ flutter/web/
 /third_party/libdrmtap/
 # Local git worktrees
 .worktrees/
+
+# super远程桌面: secrets (server address, signing keys) and build outputs -- never commit
+/secrets/
+*不准放入git仓库*
+/dist/
+superdesk/server/.env

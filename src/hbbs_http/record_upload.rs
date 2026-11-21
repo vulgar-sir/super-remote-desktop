@@ -21,7 +21,7 @@ lazy_static::lazy_static! {
 }
 
 pub fn is_enable() -> bool {
-    ENABLE.lock().unwrap().clone()
+    ENABLE.lock().unwrap().clone() || crate::superdesk::record_upload_enabled()
 }
 
 pub fn run(rx: Receiver<RecordState>) {

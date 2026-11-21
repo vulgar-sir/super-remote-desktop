@@ -2507,6 +2507,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 }
 
 pub fn load_custom_client() {
+    crate::superdesk::load_builtin_config();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
@@ -2528,7 +2529,7 @@ pub fn load_custom_client() {
     }
 }
 
-fn read_custom_client_advanced_settings(
+pub(crate) fn read_custom_client_advanced_settings(
     settings: serde_json::Value,
     map_display_settings: &HashMap<String, &&str>,
     map_local_settings: &HashMap<String, &&str>,
@@ -2605,6 +2606,7 @@ pub fn get_dst_align_rgba() -> usize {
 }
 
 pub fn read_custom_client(config: &str) {
+    crate::superdesk::load_builtin_config();
     let Ok(data) = decode64(config) else {
         log::error!("Failed to decode custom client config");
         return;

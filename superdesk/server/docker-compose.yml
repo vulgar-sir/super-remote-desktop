@@ -1,0 +1,71 @@
+# super远程桌面 server
+#   hbbs     ID / rendezvous server        (RustDesk Server OSS + TCP/WebSocket registration patch)
+#   hbbr     relay server, with bandwidth limits
+#   console  super控制台: management console + RustDesk-compatible API (/api, /admin)
+#   gateway  nginx on the ONE public port: /ws/id, /ws/relay, /api, /admin, /download
+#
+# Usage: cp .env.example .env && edit .env && docker compose up -d --build
+name: superdesk
+
+services:
+  hbbr:
+    image: rustdesk/rustdesk-server:1.1.16
+    container_name: superdesk-hbbr
+    command: hbbr
+    environment:
+      # Relay bandwidth governance (all sessions are relayed in single-port mode), Mb/s
+      - TOTAL_BANDWIDTH=${RELAY_TOTAL_MBPS:-100}
+      - SINGLE_BANDWIDTH=${RELAY_SINGLE_MBPS:-16}
+      - LIMIT_SPEED=${RELAY_DOWNGRADED_MBPS:-4}
+      - DOWNGRADE_THRESHOLD=${RELAY_DOWNGRADE_THRESHOLD:-0.66}
+      - DOWNGRADE_START_CHECK=${RELAY_DOWNGRADE_START_SECS:-1800}
+    volumes:
+      - ./data:/root
+    network_mode: host
+    restart: unless-stopped
+
+  hbbs:
+    # Official hbbs 1.1.16 + patch: devices register over TCP/WebSocket (single public port).
+    # Built from ./hbbs-build (uploaded by superdesk/scripts/deploy-server.py).
+    build:
+      context: ./hbbs-build
+    image: superdesk-hbbs:1.1.16-tcpreg
+    container_name: superdesk-hbbs
+    command: hbbs -r ${PUBLIC_HOST:?set PUBLIC_HOST in .env}
+    volumes:
+      - ./data:/root
+    network_mode: host
+    depends_on:
+      - hbbr
+    restart: unless-stopped
+
+  console:
+    build:
+      context: ./console
+      args:
+        - PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
+    image: superdesk-console:latest
+    container_name: superdesk-console
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - SUPERDESK_ADMIN_USER=${CONSOLE_ADMIN_USER:-admin}
+      - SUPERDESK_ADMIN_PASSWORD=${CONSOLE_ADMIN_PASSWORD:-}
+    volumes:
+      - ./data/console:/data
+    network_mode: host
+    restart: unless-stopped
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: superdesk-gateway
+    environment:
+      - GATEWAY_PORT=${GATEWAY_PORT:?set GATEWAY_PORT in .env}
+    volumes:
+      - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./download:/usr/share/superdesk/download:ro
+    network_mode: host
+    depends_on:
+      - hbbs
+      - hbbr
+      - console
+    restart: unless-stopped

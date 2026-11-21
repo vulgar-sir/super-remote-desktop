@@ -1,0 +1,322 @@
+diff --git a/src/rendezvous_server.rs b/src/rendezvous_server.rs
+index dff45eb..1478706 100644
+--- a/src/rendezvous_server.rs
++++ b/src/rendezvous_server.rs
+@@ -53,6 +53,8 @@ type WsSink = SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, tungsteni
+ enum Sink {
+     TcpStream(TcpStreamSink),
+     Ws(WsSink),
++    // super远程桌面: writer task of a connection a device registered on (see TCP_REG)
++    Chan(mpsc::UnboundedSender<Option<Bytes>>),
+ }
+ type Sender = mpsc::UnboundedSender<Data>;
+ type Receiver = mpsc::UnboundedReceiver<Data>;
+@@ -69,6 +71,19 @@ struct PunchReqEntry { tm: Instant, from_ip: String, to_ip: String, to_id: Strin
+ static PUNCH_REQS: Lazy<TokioMutex<Vec<PunchReqEntry>>> = Lazy::new(|| TokioMutex::new(Vec::new()));
+ const PUNCH_REQ_DEDUPE_SEC: u64 = 60;
+ 
++// super远程桌面: devices that registered over TCP/WebSocket (single public port, no UDP).
++// Keyed by the connection's address, which the peer map stores as the device's socket_addr;
++// messages for that address are written to the connection instead of being sent over UDP.
++static TCP_REG: Lazy<TokioMutex<HashMap<SocketAddr, (String, mpsc::UnboundedSender<Option<Bytes>>)>>> =
++    Lazy::new(Default::default);
++const TCP_REG_KEEP_ALIVE_SECS: i32 = 30;
++const TCP_REG_HEARTBEAT_SECS: u64 = 15;
++// super远程桌面: WebRTC signalling (P2P over the single port): controller punch connections
++// that receive trickled ICE candidates after the answer, keyed like tcp_punch (see ice_route).
++static ICE_ROUTE: Lazy<TokioMutex<HashMap<SocketAddr, mpsc::UnboundedSender<Option<Bytes>>>>> =
++    Lazy::new(Default::default);
++const MAX_ICE_CANDIDATE_LEN: usize = 2048;
++
+ #[derive(Clone)]
+ struct Inner {
+     serial: i32,
+@@ -251,7 +266,18 @@ impl RendezvousServer {
+                 }
+                 Some(data) = rx.recv() => {
+                     match data {
+-                        Data::Msg(msg, addr) => { allow_err!(socket.send(msg.as_ref(), addr).await); }
++                        Data::Msg(msg, addr) => {
++                            // super远程桌面: TCP/WS-registered device -> its connection, else UDP
++                            let tcp = TCP_REG.lock().await.get(&try_into_v4(addr)).map(|x| x.1.clone());
++                            match tcp {
++                                Some(tx) => {
++                                    if let Ok(bytes) = msg.write_to_bytes() {
++                                        tx.send(Some(Bytes::from(bytes))).ok();
++                                    }
++                                }
++                                None => { allow_err!(socket.send(msg.as_ref(), addr).await); }
++                            }
++                        }
+                         Data::RelayServers0(rs) => { self.parse_relay_servers(&rs); }
+                         Data::RelayServers(rs) => { self.relay_servers = Arc::new(rs); }
+                     }
+@@ -480,6 +506,14 @@ impl RendezvousServer {
+         key: &str,
+         ws: bool,
+     ) -> bool {
++        // super远程桌面: any frame (incl. the empty heartbeat echo) on a registered connection
++        // keeps that device online.
++        let reg_id = TCP_REG.lock().await.get(&try_into_v4(addr)).map(|x| x.0.clone());
++        if let Some(id) = reg_id.as_ref() {
++            if let Some(peer) = self.pm.get_in_memory(id).await {
++                peer.write().await.last_reg_time = Instant::now();
++            }
++        }
+         if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(bytes) {
+             match msg_in.union {
+                 Some(rendezvous_message::Union::PunchHoleRequest(ph)) => {
+@@ -521,12 +555,20 @@ impl RendezvousServer {
+                             rr.relay_server = self.get_relay_server(addr.ip(), addr_b.ip());
+                         }
+                     }
++                    if !rr.webrtc_sdp_answer.is_empty() {
++                        self.ice_route(addr_b).await;
++                    }
+                     msg_out.set_relay_response(rr);
+                     allow_err!(self.send_to_tcp_sync(msg_out, addr_b).await);
+                 }
+                 Some(rendezvous_message::Union::PunchHoleSent(phs)) => {
+                     allow_err!(self.handle_hole_sent(phs, addr, None).await);
+                 }
++                Some(rendezvous_message::Union::IceCandidate(ice)) => {
++                    // super远程桌面: candidates keep their connection open (trickle ICE)
++                    self.handle_ice_candidate(ice, addr).await;
++                    return true;
++                }
+                 Some(rendezvous_message::Union::LocalAddr(la)) => {
+                     allow_err!(self.handle_local_addr(la, addr, None).await);
+                 }
+@@ -545,19 +587,161 @@ impl RendezvousServer {
+                     msg_out.set_test_nat_response(res);
+                     Self::send_to_sink(sink, msg_out).await;
+                 }
+-                Some(rendezvous_message::Union::RegisterPk(_)) => {
+-                    let res = register_pk_response::Result::NOT_SUPPORT;
++                Some(rendezvous_message::Union::RegisterPk(rk)) => {
++                    // super远程桌面: registration over TCP/WebSocket (upstream: NOT_SUPPORT)
++                    let res = self.handle_tcp_register_pk(rk, sink, addr).await;
++                    let ok = res == register_pk_response::Result::OK;
+                     let mut msg_out = RendezvousMessage::new();
+                     msg_out.set_register_pk_response(RegisterPkResponse {
+                         result: res.into(),
++                        keep_alive: if ok { TCP_REG_KEEP_ALIVE_SECS } else { 0 },
+                         ..Default::default()
+                     });
+                     Self::send_to_sink(sink, msg_out).await;
++                    return ok;
+                 }
+                 _ => {}
+             }
+         }
+-        false
++        // super远程桌面: a registered device's connection stays open
++        reg_id.is_some() || TCP_REG.lock().await.contains_key(&try_into_v4(addr))
++    }
++
++    // super远程桌面: RegisterPk received over TCP/WebSocket. Same checks as the UDP path; on
++    // success the connection becomes the device's channel for punch-hole/relay requests.
++    async fn handle_tcp_register_pk(
++        &mut self,
++        rk: RegisterPk,
++        sink: &mut Option<Sink>,
++        addr: SocketAddr,
++    ) -> register_pk_response::Result {
++        if rk.uuid.is_empty() || rk.pk.is_empty() || rk.id.len() < 6 {
++            return UUID_MISMATCH;
++        }
++        let id = rk.id;
++        let ip = addr.ip().to_string();
++        if !self.check_ip_blocker(&ip, &id).await {
++            return TOO_FREQUENT;
++        }
++        let peer = self.pm.get_or(&id).await;
++        {
++            let p = peer.read().await;
++            if !p.uuid.is_empty() {
++                if p.uuid != rk.uuid {
++                    log::warn!("Peer {} uuid mismatch (tcp): {:?} vs {:?}", id, rk.uuid, p.uuid);
++                    return UUID_MISMATCH;
++                }
++                if p.info.ip != ip && p.pk != rk.pk {
++                    log::warn!("Peer {} ip/pk mismatch (tcp): {} vs {}", id, ip, p.info.ip);
++                    return UUID_MISMATCH;
++                }
++            }
++        }
++        let res = self.pm.update_pk(id.clone(), peer, addr, rk.uuid, rk.pk, ip).await;
++        if res == register_pk_response::Result::OK {
++            Self::register_tcp_sink(id, sink, addr).await;
++        }
++        res
++    }
++
++    // super远程桌面: move a connection's sink into a writer task fed by a channel, so several
++    // parties (registration heartbeat, punch replies, WebRTC candidates) can write to it.
++    fn spawn_sink_writer(raw: Sink) -> mpsc::UnboundedSender<Option<Bytes>> {
++        if let Sink::Chan(tx) = raw {
++            return tx;
++        }
++        let (tx, mut rx) = mpsc::unbounded_channel::<Option<Bytes>>();
++        tokio::spawn(async move {
++            let mut raw = raw;
++            // None = the reading side is done: close the connection so the device
++            // notices and registers again instead of idling on heartbeats.
++            while let Some(Some(bytes)) = rx.recv().await {
++                let ok = match &mut raw {
++                    Sink::TcpStream(s) => s.send(bytes).await.is_ok(),
++                    Sink::Ws(ws) => ws.send(tungstenite::Message::Binary(bytes.to_vec())).await.is_ok(),
++                    Sink::Chan(c) => c.send(Some(bytes)).is_ok(),
++                };
++                if !ok {
++                    break;
++                }
++            }
++            match &mut raw {
++                Sink::TcpStream(s) => { s.close().await.ok(); }
++                Sink::Ws(ws) => { ws.close().await.ok(); }
++                Sink::Chan(_) => {}
++            }
++        });
++        tx
++    }
++
++    // super远程桌面: writer of controller connection `addr` for WebRTC signalling. The punch
++    // reply normally takes the controller's sink and drops it; once the reply carries a WebRTC
++    // answer (or a candidate arrives first) the sink moves behind a channel kept in ICE_ROUTE,
++    // so the trickled ICE candidates that follow can still reach the controller.
++    async fn ice_route(&self, addr: SocketAddr) -> Option<mpsc::UnboundedSender<Option<Bytes>>> {
++        let addr = try_into_v4(addr);
++        let mut routes = ICE_ROUTE.lock().await;
++        if let Some(tx) = routes.get(&addr) {
++            return Some(tx.clone());
++        }
++        let mut punch = self.tcp_punch.lock().await;
++        let tx = Self::spawn_sink_writer(punch.remove(&addr)?);
++        punch.insert(addr, Sink::Chan(tx.clone()));
++        routes.insert(addr, tx.clone());
++        Some(tx)
++    }
++
++    // super远程桌面: trickled WebRTC ICE candidate. From the controlled device (socket_addr =
++    // the controller's punch connection) or from the controller (id = the controlled device).
++    async fn handle_ice_candidate(&mut self, mut ice: IceCandidate, addr: SocketAddr) {
++        if ice.session_key.is_empty() || ice.candidate.is_empty() || ice.candidate.len() > MAX_ICE_CANDIDATE_LEN {
++            return;
++        }
++        let mut msg_out = RendezvousMessage::new();
++        if !ice.socket_addr.is_empty() {
++            let addr_a = AddrMangle::decode(&ice.socket_addr);
++            if let Some(tx) = self.ice_route(addr_a).await {
++                ice.socket_addr = Default::default();
++                msg_out.set_ice_candidate(ice);
++                if let Ok(bytes) = msg_out.write_to_bytes() {
++                    tx.send(Some(Bytes::from(bytes))).ok();
++                }
++            }
++        } else if let Some(peer) = self.pm.get_in_memory(&ice.id).await {
++            ice.socket_addr = AddrMangle::encode(addr).into();
++            msg_out.set_ice_candidate(ice);
++            let peer_addr = peer.read().await.socket_addr;
++            self.tx.send(Data::Msg(msg_out.into(), peer_addr)).ok();
++        }
++    }
++
++    async fn register_tcp_sink(id: String, sink: &mut Option<Sink>, addr: SocketAddr) {
++        let tx = match sink.take() {
++            Some(Sink::Chan(tx)) => tx,
++            Some(raw) => {
++                let tx = Self::spawn_sink_writer(raw);
++                // Heartbeat: the client echoes empty frames, which keeps the device online and
++                // makes a dead connection fail the next write.
++                let hb = tx.clone();
++                tokio::spawn(async move {
++                    let mut t = interval(Duration::from_secs(TCP_REG_HEARTBEAT_SECS));
++                    t.tick().await;
++                    loop {
++                        t.tick().await;
++                        if hb.send(Some(Bytes::new())).is_err() {
++                            break;
++                        }
++                    }
++                });
++                tx
++            }
++            None => return,
++        };
++        *sink = Some(Sink::Chan(tx.clone()));
++        log::info!("Peer {} registered over tcp/ws from {:?}", id, addr);
++        let mut reg = TCP_REG.lock().await;
++        reg.retain(|_, v| v.0 != id);
++        reg.insert(try_into_v4(addr), (id, tx));
+     }
+ 
+     #[inline]
+@@ -624,11 +808,15 @@ impl RendezvousServer {
+             socket_addr: AddrMangle::encode(addr).into(),
+             pk: self.get_pk(&phs.version, phs.id).await,
+             relay_server: phs.relay_server.clone(),
++            webrtc_sdp_answer: phs.webrtc_sdp_answer,
+             ..Default::default()
+         };
+         if let Ok(t) = phs.nat_type.enum_value() {
+             p.set_nat_type(t);
+         }
++        if socket.is_none() && !p.webrtc_sdp_answer.is_empty() {
++            self.ice_route(addr_a).await;
++        }
+         msg_out.set_punch_hole_response(p);
+         if let Some(socket) = socket {
+             socket.send(&msg_out, addr_a).await?;
+@@ -767,6 +955,7 @@ impl RendezvousServer {
+                     socket_addr,
+                     nat_type: ph.nat_type,
+                     relay_server,
++                    webrtc_sdp_offer: ph.webrtc_sdp_offer,
+                     ..Default::default()
+                 });
+             }
+@@ -829,6 +1018,9 @@ impl RendezvousServer {
+                     Sink::Ws(ws) => {
+                         allow_err!(ws.send(tungstenite::Message::Binary(bytes)).await);
+                     }
++                    Sink::Chan(tx) => {
++                        tx.send(Some(Bytes::from(bytes))).ok();
++                    }
+                 }
+             }
+         }
+@@ -1158,10 +1350,10 @@ impl RendezvousServer {
+                     .or_else(|| headers.get("X-Forwarded-For"))
+                     .and_then(|header_value| header_value.to_str().ok());
+                 if let Some(ip) = real_ip {
+-                    if ip.contains('.') {
+-                        addr = format!("{ip}:0").parse().unwrap_or(addr);
+-                    } else {
+-                        addr = format!("[{ip}]:0").parse().unwrap_or(addr);
++                    // super远程桌面: keep the connection's own port so devices behind one NAT
++                    // stay distinct (upstream used port 0)
++                    if let Ok(ip) = ip.split(',').next().unwrap_or("").trim().parse::<IpAddr>() {
++                        addr = SocketAddr::new(ip, addr.port());
+                     }
+                 }
+                 Ok(response)
+@@ -1188,6 +1380,18 @@ impl RendezvousServer {
+         if sink.is_none() {
+             self.tcp_punch.lock().await.remove(&try_into_v4(addr));
+         }
++        if let Some(tx) = ICE_ROUTE.lock().await.remove(&try_into_v4(addr)) {
++            tx.send(None).ok();
++        }
++        // super远程桌面: the device's channel is gone -- close its writer (and thus the socket)
++        if let Some(Sink::Chan(tx)) = sink.as_ref() {
++            tx.send(None).ok();
++        }
++        let mut reg = TCP_REG.lock().await;
++        if reg.remove(&try_into_v4(addr)).is_some() {
++            log::info!("tcp/ws registration from {:?} closed", addr);
++        }
++        drop(reg);
+         log::debug!("Tcp connection from {:?} closed", addr);
+         Ok(())
+     }

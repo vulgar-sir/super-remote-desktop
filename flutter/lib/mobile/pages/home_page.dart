@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/mobile/pages/server_page.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
+import 'package:flutter_hbb/superdesk/superdesk.dart';
+import 'package:flutter_hbb/superdesk/theme.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
@@ -43,6 +45,8 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     initPages();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => superdeskCheckUpdateWithDialog(context));
   }
 
   void initPages() {
@@ -73,13 +77,21 @@ class HomePageState extends State<HomePage> {
           return false;
         },
         child: Scaffold(
-          // backgroundColor: MyTheme.grayBg,
+          backgroundColor: SdPalette(context).page,
           appBar: AppBar(
             centerTitle: true,
             title: appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
+            // super远程桌面: light header
+            backgroundColor: SdPalette(context).side,
+            foregroundColor: SdPalette(context).text,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            surfaceTintColor: Colors.transparent,
+            shape: Border(bottom: BorderSide(color: SdPalette(context).line)),
           ),
           bottomNavigationBar: BottomNavigationBar(
+            backgroundColor: SdPalette(context).side,
             key: navigationBarKey,
             items: _pages
                 .map((page) =>
@@ -87,7 +99,7 @@ class HomePageState extends State<HomePage> {
                 .toList(),
             currentIndex: _selectedIndex,
             type: BottomNavigationBarType.fixed,
-            selectedItemColor: MyTheme.accent, //
+            selectedItemColor: kSdAccent, //
             unselectedItemColor: MyTheme.darkGray,
             onTap: (index) => setState(() {
               // close chat overlay when go chat page
@@ -150,7 +162,16 @@ class HomePageState extends State<HomePage> {
         ],
       );
     }
-    return Text(bind.mainGetAppNameSync());
+    // super远程桌面: display name from the build config, with the app icon.
+    final name = superdeskOption('superdesk-display-name');
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image.asset('assets/icon.png', width: 24, height: 24)),
+      const SizedBox(width: 8),
+      Text(name.isEmpty ? bind.mainGetAppNameSync() : name,
+          style: const TextStyle(fontWeight: FontWeight.w600)),
+    ]);
   }
 }
 

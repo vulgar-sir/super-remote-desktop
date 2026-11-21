@@ -1,0 +1,7 @@
+{
+  "server_host": "1.2.3.4",
+  "ws_port": "12345",
+  "rs_pub_key": "<contents of /opt/superdesk/data/id_ed25519.pub on the server>",
+  "api_server": "http://1.2.3.4:12345",
+  "p2p": false
+}

@@ -1,0 +1,64 @@
+diff --git a/protos/rendezvous.proto b/protos/rendezvous.proto
+index b9b8ed7..b1b3593 100644
+--- a/protos/rendezvous.proto
++++ b/protos/rendezvous.proto
+@@ -23,12 +23,14 @@ message PunchHoleRequest {
+   ConnType conn_type = 4;
+   string token = 5;
+   string version = 6;
++  string webrtc_sdp_offer = 12;
+ }
+ 
+ message PunchHole { 
+   bytes socket_addr = 1;
+   string relay_server = 2;
+   NatType nat_type = 3;
++  string webrtc_sdp_offer = 10;
+ }
+ 
+ message TestNatRequest {
+@@ -53,6 +55,7 @@ message PunchHoleSent {
+   string relay_server = 3;
+   NatType nat_type = 4;
+   string version = 5;
++  string webrtc_sdp_answer = 8;
+ }
+ 
+ message RegisterPk {
+@@ -93,6 +96,7 @@ message PunchHoleResponse {
+   }
+   string other_failure = 7;
+   int32 feedback = 8;
++  string webrtc_sdp_answer = 12;
+ }
+ 
+ message ConfigUpdate {
+@@ -122,6 +126,7 @@ message RelayResponse {
+   string refuse_reason = 6;
+   string version = 7;
+   int32 feedback = 9;
++  string webrtc_sdp_answer = 12;
+ }
+ 
+ message SoftwareUpdate { string url = 1; }
+@@ -170,6 +175,13 @@ message HealthCheck {
+   string token = 1;
+ }
+ 
++message IceCandidate {
++  string id = 1;
++  bytes socket_addr = 2;
++  string session_key = 3;
++  string candidate = 4;
++}
++
+ message RendezvousMessage {
+   oneof union {
+     RegisterPeer register_peer = 6;
+@@ -193,5 +205,6 @@ message RendezvousMessage {
+     OnlineResponse online_response = 24;
+     KeyExchange key_exchange = 25;
+     HealthCheck hc = 26;
++    IceCandidate ice_candidate = 29;
+   }
+ }
