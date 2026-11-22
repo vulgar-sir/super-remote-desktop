@@ -25,6 +25,7 @@ import '../../models/shortcut_model.dart';
 import '../../utils/image.dart';
 import '../widgets/dialog.dart';
 import '../widgets/custom_scale_widget.dart';
+import 'package:flutter_hbb/superdesk/quick_apps.dart' show sdShowQuickAppsPanel;
 
 final initText = '1' * 1024;
 
@@ -657,6 +658,12 @@ class _RemotePageState extends State<RemotePage> with WidgetsBindingObserver {
                                 onPressed: () => setState(
                                     () => _showGestureHelp = !_showGestureHelp),
                               ),
+                              if (gFFI.ffiModel.pi.platform == kPeerPlatformWindows)
+                                IconButton(
+                                  color: Colors.white,
+                                  icon: const Icon(Icons.apps_rounded),
+                                  onPressed: () => sdShowQuickAppsPanel(gFFI, widget.id),
+                                ),
                             ]) +
                   (isWeb
                       ? []
