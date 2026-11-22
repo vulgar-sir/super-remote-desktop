@@ -205,7 +205,7 @@ void sdShowQuickAppsPanel(FFI ffi, String peerId) {
         height: math.min(440.0, MediaQuery.of(context).size.height - 260),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           TextField(
-            autofocus: true,
+            autofocus: isDesktop, // on phones the soft keyboard would cover the list
             onChanged: (v) => query.value = v.trim().toLowerCase(),
             decoration: sdInputDecoration(p, '搜索对方电脑上的应用').copyWith(
                 prefixIcon: Icon(Icons.search_rounded, size: 18, color: p.hint),
