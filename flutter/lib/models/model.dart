@@ -51,6 +51,7 @@ import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 import 'package:flutter_hbb/superdesk/devices.dart' show sdApplyViewMode;
 import 'package:flutter_hbb/superdesk/quick_apps.dart' show sdOnQuickAppsEvent, sdQuickAppsOnConnected;
+import 'package:flutter_hbb/superdesk/extend_screen.dart' show sdExtendScreenOnConnected;
 
 typedef HandleMsgBox = Function(Map<String, dynamic> evt, String id);
 typedef ReconnectHandle = Function(OverlayDialogManager, SessionID, bool);
@@ -1478,6 +1479,7 @@ class FfiModel with ChangeNotifier {
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
       if (!isCache) sdApplyViewMode(this, peerId);
       if (!isCache) sdQuickAppsOnConnected(this, peerId);
+      if (!isCache) sdExtendScreenOnConnected(this, peerId);
     }
     if (connType == ConnType.defaultConn || connType == ConnType.viewCamera) {
       final platformAdditions = evt['platform_additions'];

@@ -21,6 +21,7 @@ import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
 
 import 'devices.dart';
+import 'extend_screen.dart';
 import 'quick_apps.dart';
 import 'theme.dart';
 import 'wallpaper.dart';
@@ -663,6 +664,15 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
                 Navigator.pop(ctx);
                 connect(context, x.id, isViewCamera: true);
               }),
+          if (x.platform == 'Windows')
+            ListTile(
+                leading: const Icon(Icons.filter_none_rounded),
+                title: const Text('无线副屏'),
+                subtitle: const Text('把本机当作这台电脑的扩展屏'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  sdStartExtendScreen(context, x.id);
+                }),
           ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('修改备注名'),

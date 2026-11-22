@@ -21,6 +21,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'desktop_settings.dart';
 import 'devices.dart';
+import 'extend_screen.dart';
 import 'notices.dart';
 import 'quick_apps.dart';
 import 'superdesk.dart';
@@ -178,6 +179,7 @@ Widget? sdTitleBarTail(BuildContext context) {
   if (bind.isIncomingOnly()) return null;
   final p = SdPalette(context);
   return Row(mainAxisSize: MainAxisSize.min, children: [
+    sdIconButton(p, Icons.filter_none_rounded, '无线副屏', _extendScreenHelp, color: p.text, size: 18),
     sdNoticeBell(p),
     if (!bind.isDisableAccount()) _accountButton(p),
     _menuButton(context, p),
@@ -248,6 +250,19 @@ PopupMenuItem<int> _menuItem(int v, IconData icon, String label) => PopupMenuIte
       height: 40,
       child: Row(children: [Icon(icon, size: 18), const SizedBox(width: 12), Text(label)]),
     );
+
+void _extendScreenHelp() {
+  gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(
+        title: const Text('无线副屏'),
+        content: const Text('把手机、平板或另一台电脑当作这台电脑的扩展屏：\n\n'
+            '1. 这台电脑需要安装 super远程桌面（以服务方式运行），系统为 Windows 10 2004 或更新版本；\n'
+            '2. 在那台设备的 super远程桌面 里打开这台电脑的设备页，点“更多 → 无线副屏”；\n'
+            '3. 连接后会自动新增一块虚拟显示器并只显示它，断开后自动移除。'),
+        actions: [dialogButton('OK', onPressed: close)],
+        onSubmit: close,
+        onCancel: close,
+      ));
+}
 
 void _howToAddDialog() {
   gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(
@@ -1211,9 +1226,11 @@ class _DevicePageState extends State<_DevicePage> {
                   const PopupMenuItem(value: 3, child: Text('远程摄像头')),
                   if (x.platform.toLowerCase().contains('windows'))
                     const PopupMenuItem(value: 1, child: Text('RDP 远程桌面')),
+                  if (x.platform == kPeerPlatformWindows) const PopupMenuItem(value: 4, child: Text('无线副屏')),
                   const PopupMenuItem(value: 2, child: Text('复制设备ID')),
                 ],
                 onSelected: (v) {
+                  if (v == 4) sdStartExtendScreen(context, x.id);
                   if (v == 1) connect(context, x.id, isRDP: true);
                   if (v == 2) sdCopy(x.id);
                   if (v == 3) connect(context, x.id, isViewCamera: true);
