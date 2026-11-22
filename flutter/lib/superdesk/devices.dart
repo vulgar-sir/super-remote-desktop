@@ -8,6 +8,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
+import 'package:flutter_hbb/consts.dart';
+import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
@@ -106,4 +108,25 @@ void sdPeerInfoDialog(Peer x) {
         onCancel: close,
         onSubmit: close,
       ));
+}
+
+/// 观看模式 / 进入桌面 on the device page: the wanted mode rides on a one-shot peer option and is
+/// applied with the toolbar's own view-mode toggle once the session has its peer info.
+const kSdViewModeOption = 'sd-view-mode';
+
+Future<void> sdConnectMode(BuildContext context, String id, {required bool viewOnly}) async {
+  await bind.mainSetPeerOption(id: id, key: kSdViewModeOption, value: viewOnly ? 'Y' : 'N');
+  if (context.mounted) connect(context, id);
+}
+
+Future<void> sdApplyViewMode(FfiModel ffiModel, String peerId) async {
+  final sessionId = ffiModel.sessionId;
+  final want = await bind.sessionGetOption(sessionId: sessionId, arg: kSdViewModeOption);
+  if (want == null || want.isEmpty) return;
+  await bind.sessionPeerOption(sessionId: sessionId, name: kSdViewModeOption, value: '');
+  final on = want == 'Y';
+  if (bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: kOptionToggleViewOnly) != on) {
+    await bind.sessionToggleOption(sessionId: sessionId, value: kOptionToggleViewOnly);
+    ffiModel.setViewOnly(peerId, on);
+  }
 }

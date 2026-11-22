@@ -1,6 +1,6 @@
 // super远程桌面: Android main screen in the UU-remote-like style -- three tabs (远程协助 / 设备 / 设置)
 // with big page titles, the "远控伙伴设备" card + "输入设备验证码" dialog, this device's ID and code,
-// and a device page (preview card, 文件传输 / 远程摄像头 / 终端 / 更多). Connecting, the screen-share
+// and a device page (preview card, 文件传输 / 观看模式 / 终端 / 更多). Connecting, the screen-share
 // service, permissions and settings reuse the existing widgets and models.
 
 import 'dart:async';
@@ -607,7 +607,7 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
       decoration: BoxDecoration(color: p.card, borderRadius: BorderRadius.circular(12)),
       child: Column(children: [
         InkWell(
-          onTap: () => connect(context, x.id),
+          onTap: () => sdConnectMode(context, x.id, viewOnly: false),
           child: Container(
             height: 190,
             decoration: BoxDecoration(
@@ -630,7 +630,7 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
         Row(children: [
           action(Icons.drive_folder_upload_outlined, '文件传输', () => connect(context, x.id, isFileTransfer: true)),
           sep(),
-          action(Icons.videocam_outlined, '远程摄像头', () => connect(context, x.id, isViewCamera: true)),
+          action(Icons.smart_display_outlined, '观看模式', () => sdConnectMode(context, x.id, viewOnly: true)),
           sep(),
           action(Icons.terminal_rounded, '终端', () => connect(context, x.id, isTerminal: true)),
           sep(),
@@ -648,6 +648,13 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(14))),
       builder: (ctx) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+              leading: const Icon(Icons.videocam_outlined),
+              title: const Text('远程摄像头'),
+              onTap: () {
+                Navigator.pop(ctx);
+                connect(context, x.id, isViewCamera: true);
+              }),
           ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('修改备注名'),

@@ -49,6 +49,7 @@ import 'package:flutter_hbb/generated_bridge.dart'
     if (dart.library.html) 'package:flutter_hbb/web/bridge.dart';
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
+import 'package:flutter_hbb/superdesk/devices.dart' show sdApplyViewMode;
 
 typedef HandleMsgBox = Function(Map<String, dynamic> evt, String id);
 typedef ReconnectHandle = Function(OverlayDialogManager, SessionID, bool);
@@ -1472,6 +1473,7 @@ class FfiModel with ChangeNotifier {
               sessionId: sessionId, arg: kOptionToggleViewOnly));
       setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
+      if (!isCache) sdApplyViewMode(this, peerId);
     }
     if (connType == ConnType.defaultConn || connType == ConnType.viewCamera) {
       final platformAdditions = evt['platform_additions'];

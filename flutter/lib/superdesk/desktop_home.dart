@@ -1005,7 +1005,7 @@ class _DevicePageState extends State<_DevicePage> {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.line)),
       child: Column(children: [
         InkWell(
-          onTap: () => connect(context, x.id),
+          onTap: () => sdConnectMode(context, x.id, viewOnly: false),
           child: Container(
             height: 300,
             decoration: BoxDecoration(
@@ -1032,7 +1032,7 @@ class _DevicePageState extends State<_DevicePage> {
           child: Row(children: [
             action(Icons.drive_folder_upload_outlined, '文件传输', () => connect(context, x.id, isFileTransfer: true)),
             sep(),
-            action(Icons.videocam_outlined, '远程摄像头', () => connect(context, x.id, isViewCamera: true)),
+            action(Icons.smart_display_outlined, '观看模式', () => sdConnectMode(context, x.id, viewOnly: true)),
             sep(),
             action(Icons.terminal_rounded, '终端', () => connect(context, x.id, isTerminal: true)),
             sep(),
@@ -1044,6 +1044,7 @@ class _DevicePageState extends State<_DevicePage> {
                 tooltip: '更多',
                 icon: Icon(Icons.grid_view_rounded, color: p.text, size: 20),
                 itemBuilder: (_) => [
+                  const PopupMenuItem(value: 3, child: Text('远程摄像头')),
                   if (x.platform.toLowerCase().contains('windows'))
                     const PopupMenuItem(value: 1, child: Text('RDP 远程桌面')),
                   const PopupMenuItem(value: 2, child: Text('复制设备ID')),
@@ -1051,6 +1052,7 @@ class _DevicePageState extends State<_DevicePage> {
                 onSelected: (v) {
                   if (v == 1) connect(context, x.id, isRDP: true);
                   if (v == 2) sdCopy(x.id);
+                  if (v == 3) connect(context, x.id, isViewCamera: true);
                 },
               ),
             ),
