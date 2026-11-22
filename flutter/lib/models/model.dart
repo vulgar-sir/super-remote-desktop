@@ -50,6 +50,7 @@ import 'package:flutter_hbb/generated_bridge.dart'
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 import 'package:flutter_hbb/superdesk/devices.dart' show sdApplyViewMode;
+import 'package:flutter_hbb/superdesk/quick_apps.dart' show sdOnQuickAppsEvent, sdQuickAppsOnConnected;
 
 typedef HandleMsgBox = Function(Map<String, dynamic> evt, String id);
 typedef ReconnectHandle = Function(OverlayDialogManager, SessionID, bool);
@@ -360,6 +361,8 @@ class FfiModel with ChangeNotifier {
         Clipboard.setData(ClipboardData(text: evt['content']));
       } else if (name == 'permission') {
         updatePermission(evt, peerId);
+      } else if (name == 'sd_quick_apps') {
+        sdOnQuickAppsEvent(peerId, evt['data'] ?? '');
       } else if (name == 'chat_client_mode') {
         parent.target?.chatModel
             .receive(ChatModel.clientModeID, evt['text'] ?? '');
@@ -1474,6 +1477,7 @@ class FfiModel with ChangeNotifier {
       setShowMyCursor(bind.sessionGetToggleOptionSync(
           sessionId: sessionId, arg: kOptionToggleShowMyCursor));
       if (!isCache) sdApplyViewMode(this, peerId);
+      if (!isCache) sdQuickAppsOnConnected(this, peerId);
     }
     if (connType == ConnType.defaultConn || connType == ConnType.viewCamera) {
       final platformAdditions = evt['platform_additions'];

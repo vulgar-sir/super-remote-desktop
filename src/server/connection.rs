@@ -4070,6 +4070,13 @@ impl Connection {
                             self.send(msg_out).await;
                         }
                     }
+                    Some(misc::Union::SdQuickApps(q)) => {
+                        if self.is_remote() && self.peer_keyboard_enabled() {
+                            if let Some(msg) = crate::superdesk::quick_apps::serve(q).await {
+                                self.send(msg).await;
+                            }
+                        }
+                    }
                     // Only to a connection the cursor service would send the shape to.
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     Some(misc::Union::RequestCursorData(id)) => {

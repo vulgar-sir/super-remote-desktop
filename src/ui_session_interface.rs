@@ -391,6 +391,10 @@ impl<T: InvokeUiSession> Session<T> {
     }
 
     pub fn toggle_option(&self, name: String) {
+        if let Some(msg) = crate::superdesk::quick_apps::client_command(&name) {
+            self.send(Data::Message(msg));
+            return;
+        }
         let msg = self.lc.write().unwrap().toggle_option(name.clone());
         #[cfg(all(target_os = "windows", not(feature = "flutter")))]
         if name == keys::OPTION_ENABLE_FILE_COPY_PASTE {

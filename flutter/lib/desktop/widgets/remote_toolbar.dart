@@ -3,6 +3,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hbb/superdesk/quick_apps.dart' show SdQuickAppsToolbarButton, kSdToolbarIcon, kSdToolbarHover;
+import 'package:flutter_hbb/superdesk/theme.dart' show kSdAccent, SdPalette;
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/keyboard_shortcuts/display.dart';
@@ -836,6 +838,9 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
 
     toolbarItems
         .add(_ControlMenu(id: widget.id, ffi: widget.ffi, state: widget.state));
+    if (widget.ffi.connType == ConnType.defaultConn) {
+      toolbarItems.add(SdQuickAppsToolbarButton(id: widget.id, ffi: widget.ffi));
+    }
     toolbarItems.add(_DisplayMenu(
       id: widget.id,
       ffi: widget.ffi,
@@ -852,7 +857,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
-    final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
+    final toolbarBorderRadius = BorderRadius.all(Radius.circular(_sdUuToolbar ? 8.0 : 4.0));
     // innerAxis: how the toolbar icons themselves flow.
     // outerAxis: how the toolbar block and the handle stack against each other
     // (perpendicular to the dock edge, so the handle hangs off the interior face).
@@ -865,11 +870,13 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       elevation: _ToolbarTheme.elevation,
       shadowColor: MyTheme.color(context).shadow,
       borderRadius: toolbarBorderRadius,
-      color: Theme.of(context)
-          .menuBarTheme
-          .style
-          ?.backgroundColor
-          ?.resolve(MaterialState.values.toSet()),
+      color: _sdUuToolbar
+          ? SdPalette(context).card
+          : Theme.of(context)
+              .menuBarTheme
+              .style
+              ?.backgroundColor
+              ?.resolve(MaterialState.values.toSet()),
       child: SingleChildScrollView(
         scrollDirection: innerAxis,
         child: Theme(
@@ -3057,10 +3064,13 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
   @override
   Widget build(BuildContext context) {
     assert(widget.assetName != null || widget.icon != null);
+    final sd = _sdUuToolbar && widget.icon == null;
     final icon = widget.icon ??
         SvgPicture.asset(
           widget.assetName!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(
+              sd ? _sdIconColor(context, widget.color, hover) : Colors.white,
+              BlendMode.srcIn),
           width: _ToolbarTheme.buttonSize,
           height: _ToolbarTheme.buttonSize,
         );
@@ -3084,7 +3094,9 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
                     decoration: BoxDecoration(
                       borderRadius:
                           BorderRadius.circular(_ToolbarTheme.iconRadius),
-                      color: hover ? widget.hoverColor : widget.color,
+                      color: sd
+                          ? _sdBgColor(context, widget.color, hover)
+                          : (hover ? widget.hoverColor : widget.color),
                     ),
                     child: icon)),
           )),
@@ -3142,10 +3154,13 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
   @override
   Widget build(BuildContext context) {
     assert(widget.svg != null || widget.icon != null);
+    final sd = _sdUuToolbar && widget.icon == null;
     final icon = widget.icon ??
         SvgPicture.asset(
           widget.svg!,
-          colorFilter: ColorFilter.mode(Colors.white, BlendMode.srcIn),
+          colorFilter: ColorFilter.mode(
+              sd ? _sdIconColor(context, widget.color, hover) : Colors.white,
+              BlendMode.srcIn),
           width: _ToolbarTheme.buttonSize,
           height: _ToolbarTheme.buttonSize,
         );
@@ -3167,7 +3182,9 @@ class _IconSubmenuButtonState extends State<_IconSubmenuButton> {
                         decoration: BoxDecoration(
                           borderRadius:
                               BorderRadius.circular(_ToolbarTheme.iconRadius),
-                          color: hover ? widget.hoverColor : widget.color,
+                          color: sd
+                              ? _sdBgColor(context, widget.color, hover)
+                              : (hover ? widget.hoverColor : widget.color),
                         ),
                         child: icon))),
             menuChildren: widget
@@ -3818,4 +3835,29 @@ class _MinimizedMonitorSwitchButton extends StatelessWidget {
       );
     });
   }
+}
+
+// super远程桌面: flat, UU-like toolbar buttons -- grey icons on a white bar, light-blue hover, red close --
+// instead of filled blue squares. Buttons with their own icon widget (monitors) keep the filled look.
+// `false` restores the upstream toolbar.
+const bool _sdUuToolbar = true;
+
+Color _sdIconColor(BuildContext context, Color base, bool hover) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  if (base == _ToolbarTheme.redColor) {
+    return hover ? Colors.white : const Color(0xFFE5484D);
+  }
+  if (base == _ToolbarTheme.inactiveColor) {
+    return dark ? const Color(0xFF7D8696) : const Color(0xFF9AA0A6);
+  }
+  if (hover) return kSdAccent;
+  return dark ? const Color(0xFFE8EAEE) : kSdToolbarIcon;
+}
+
+Color _sdBgColor(BuildContext context, Color base, bool hover) {
+  if (!hover) return Colors.transparent;
+  if (base == _ToolbarTheme.redColor) return const Color(0xFFE5484D);
+  return Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF2A3442)
+      : kSdToolbarHover;
 }

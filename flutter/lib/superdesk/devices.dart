@@ -246,3 +246,25 @@ class SdIncoming {
     }
   }
 }
+
+/// Power button on an offline device's preview (like the reference's 远程开机): sends RustDesk's
+/// wake-on-LAN packet, which only reaches PCs on the same LAN with wake-on-LAN enabled.
+Widget sdWakeButton(String id, {double size = 56}) => Tooltip(
+      message: '远程开机',
+      child: Material(
+        color: Colors.white.withOpacity(0.92),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: () {
+            bind.mainWol(id: id);
+            showToast('已发送开机指令（需与对方在同一局域网，且对方电脑已开启网络唤醒）');
+          },
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(Icons.power_settings_new_rounded, size: size * 0.5, color: const Color(0xFF3A7BFC)),
+          ),
+        ),
+      ),
+    );

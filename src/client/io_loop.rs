@@ -2474,6 +2474,11 @@ impl<T: InvokeUiSession> Remote<T> {
                     Some(misc::Union::FollowCurrentDisplay(d_idx)) => {
                         self.handler.set_current_display(d_idx);
                     }
+                    #[cfg(feature = "flutter")]
+                    Some(misc::Union::SdQuickApps(q)) => {
+                        let conn_type = self.handler.lc.read().unwrap().conn_type;
+                        crate::superdesk::quick_apps::on_reply(&self.handler.get_id(), conn_type, q);
+                    }
                     _ => {}
                 },
                 Some(message::Union::TestDelay(t)) => {

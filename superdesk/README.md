@@ -36,6 +36,11 @@
     服务器状态、局域网发现、直接 IP 访问、代理。每页底部“更多…设置”进入 RustDesk 原有完整设置（显示、账户、打印机、关于等）。
     安装版沿用 RustDesk 的锁定：修改安全/网络项前需管理员授权或解锁 PIN；
   - **本机被控中**：有设备正在远控本机时，侧栏顶部出现蓝色卡片“本机被控中 / 当前有 N 台设备正在控制此电脑”，点击切到被控窗口。
+  - **快速启动**（Windows 设备）：设备页“快速启动”放固定的应用（应用管理可移除），点应用即连接并在对方电脑上打开；
+    “添加”或远控工具栏的九宫格按钮列出对方开始菜单里的应用（带图标），点击即打开、点 ☆ 固定到设备页。
+    对方只会打开自己开始菜单列表里的快捷方式，且要求本次连接有键鼠控制权；需要双方都是新版本，服务器不用升级。
+  - **远控工具栏**：白色圆角工具栏 + 灰色扁平图标（悬停浅蓝、关闭红色），新增“快速启动”按钮。
+  - **远程开机**：离线设备的预览中间显示电源按钮，发送 RustDesk 的网络唤醒包（需同一局域网且对方开启网络唤醒）。
   - **端口映射窗口**：对齐 UU——设备名 + 状态、“映射列表”卡片 + 添加、表格（名称/本地端口/目标地址/目标端口/映射状态/操作“⋯”：复制本地地址、删除）；
     增删仍调用 RustDesk 原有的 session 接口；RDP 映射页保持原样。
   - **消息中心**：标题栏铃铛（未读红色数字），打开后是公告列表（公告消息 + 日期 + 未读红点、一键已读），点开看正文；公告在控制台“公告”页发布。
@@ -203,6 +208,11 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/hbbs_http/record_upload.rs` | 录屏上传开关可由控制台策略 `superdesk-record-upload` 打开（上游此开关无人设置） |
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
+| `libs/base/protos/message.proto` | 新增 `SdQuickApps`（Misc 字段 1001），快速启动的请求/应用列表/启动 |
+| `src/server/connection.rs`、`src/client/io_loop.rs`、`src/ui_session_interface.rs` | 快速启动的三处挂钩：被控端应答、主控端转发给界面、`toggle_option` 发送命令（逻辑在 `src/superdesk/quick_apps.rs`） |
+| `Cargo.toml` | winapi 加 `wingdi` 特性（读取快捷方式图标） |
+| `flutter/lib/desktop/widgets/remote_toolbar.dart` | 工具栏 UU 风格（`_sdUuToolbar`）+ 快速启动按钮 |
+| `flutter/lib/models/model.dart`、`flutter/lib/desktop/pages/remote_tab_page.dart` | 快速启动事件、连上后执行设备页的待办、接收主窗口的打开请求 |
 | `flutter/lib/desktop/pages/port_forward_page.dart` | 非 RDP 的端口映射改用 `SdPortForwardView`（一行挂钩） |
 | `flutter/lib/common/widgets/login.dart` | 登录框下方挂“注册账号”入口（`sdRegisterLink`，调用控制台 `/api/superdesk/register`） |
 | `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |

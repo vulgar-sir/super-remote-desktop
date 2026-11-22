@@ -872,7 +872,25 @@ message Misc {
     // is rebuilt, and held again, the next time it is shown, before any connection names it
     // by id again, so the shape just selected is always there to give.
     uint64 request_cursor_data = 39;
+    // super远程桌面 快速启动 (high field number, out of upstream's way)
+    SdQuickApps sd_quick_apps = 1001;
   }
+}
+
+// super远程桌面 快速启动: the controller sends request = true for the controlled side's launchable
+// apps (Start-menu shortcuts), or launch = an id from that list; the controlled side answers with
+// apps, or error.
+message SdQuickApp {
+  string id = 1;
+  string name = 2;
+  bytes icon = 3; // PNG
+}
+
+message SdQuickApps {
+  bool request = 1;
+  repeated SdQuickApp apps = 2;
+  string launch = 3;
+  string error = 4;
 }
 
 message VoiceCallRequest {

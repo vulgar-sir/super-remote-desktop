@@ -8,6 +8,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
 import 'package:flutter_hbb/common/widgets/login.dart';
+import 'package:flutter_hbb/consts.dart' show kPeerPlatformWindows;
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
@@ -21,6 +22,7 @@ import 'package:window_manager/window_manager.dart';
 import 'desktop_settings.dart';
 import 'devices.dart';
 import 'notices.dart';
+import 'quick_apps.dart';
 import 'superdesk.dart';
 import 'theme.dart';
 import 'wallpaper.dart';
@@ -1077,6 +1079,8 @@ class _DevicePageState extends State<_DevicePage> {
           if (SdSessions.peers.containsKey(x.id)) _sessionBanner(p, x),
           _preview(p, x, online, connected: SdSessions.peers.containsKey(x.id)),
           const SizedBox(height: 22),
+          if (x.platform == kPeerPlatformWindows) SdQuickLaunchSection(key: ValueKey(x.id), peerId: x.id),
+          if (x.platform != kPeerPlatformWindows) ...[
           Text('设备信息', style: TextStyle(fontSize: 15, color: p.text)),
           const SizedBox(height: 10),
           sdCard(
@@ -1089,6 +1093,7 @@ class _DevicePageState extends State<_DevicePage> {
               if (x.platform.isNotEmpty) _info(p, '系统', x.platform),
             ]),
           ),
+          ],
         ]);
       });
     });
@@ -1161,7 +1166,8 @@ class _DevicePageState extends State<_DevicePage> {
                 child: sdPlatformIcon(x.platform, size: 140, color: Colors.white.withOpacity(0.3)),
               ),
               Positioned.fill(child: SdWallpaper(id: x.id, online: online)),
-              if (!connected)
+              if (!connected && !online) Center(child: sdWakeButton(x.id)),
+              if (!connected && online)
                 const Align(
                   alignment: Alignment(0, 0.58),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -1170,7 +1176,7 @@ class _DevicePageState extends State<_DevicePage> {
                     Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                   ]),
                 )
-              else ...[
+              else if (connected) ...[
                 Positioned.fill(child: Container(color: Colors.black.withOpacity(0.38))),
                 Center(
                   child: Column(mainAxisSize: MainAxisSize.min, children: [

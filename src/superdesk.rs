@@ -7,6 +7,8 @@ use base::config::keys;
 use hbb_common::{config, log};
 use std::collections::HashMap;
 
+pub mod quick_apps;
+
 /// Upload incoming-session recordings to our console (`/api/record`). Switched on per device
 /// group by the console through the heartbeat strategy (`superdesk-record-upload` = "Y").
 pub fn record_upload_enabled() -> bool {

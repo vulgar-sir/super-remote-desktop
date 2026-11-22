@@ -21,7 +21,9 @@ import 'package:provider/provider.dart';
 import 'package:settings_ui/settings_ui.dart';
 
 import 'devices.dart';
+import 'quick_apps.dart';
 import 'theme.dart';
+import 'wallpaper.dart';
 
 /// The UU-like tabs replace the stock ones on Android builds that can both control and be controlled.
 bool get sdUseMobileHome => isAndroid && !bind.isIncomingOnly() && !bind.isOutgoingOnly();
@@ -557,6 +559,8 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _preview(p, x, online),
                 const SizedBox(height: 22),
+                if (x.platform == 'Windows') SdQuickLaunchSection(key: ValueKey(x.id), peerId: x.id, mobile: true),
+                if (x.platform != 'Windows') ...[
                 Text('设备信息', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: p.text)),
                 const SizedBox(height: 10),
                 _mobileCard(
@@ -568,6 +572,7 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
                     if (x.platform.isNotEmpty) _info(p, '系统', x.platform),
                   ]),
                 ),
+                ],
               ]),
             ),
           ]);
@@ -617,13 +622,16 @@ class _SdMobileDevicePageState extends State<SdMobileDevicePage> {
                   right: 40,
                   top: 30,
                   child: sdPlatformIcon(x.platform, size: 110, color: Colors.white.withOpacity(0.28))),
-              const Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 18),
-                  child: Text('进入桌面 ›', style: TextStyle(fontSize: 15, color: Colors.white)),
+              Positioned.fill(child: SdWallpaper(id: x.id, online: online)),
+              if (!online) Center(child: sdWakeButton(x.id, size: 52)),
+              if (online)
+                const Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 18),
+                    child: Text('进入桌面 ›', style: TextStyle(fontSize: 15, color: Colors.white)),
+                  ),
                 ),
-              ),
             ]),
           ),
         ),
