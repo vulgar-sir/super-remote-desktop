@@ -285,11 +285,13 @@ const PAGES = {
       <div class="panel"><h3>数据保留</h3><div class="row">
         <label>录屏保留天数<input id="recdays" type="number" min="1" value="${s.recording_retention_days}"></label>
         <label>审计日志保留天数<input id="auddays" type="number" min="7" value="${s.audit_retention_days}"></label></div></div>
+      <div class="panel"><h3>账号注册</h3>
+        <label class="check"><input id="allowreg" type="checkbox" ${s.allow_register !== false ? 'checked' : ''}> 允许在客户端登录框自助注册账号（无需审核，注册的是普通账号）</label></div>
       <button class="primary" id="savesettings">保存设置</button>`;
     window._hookHtml = hookHtml;
     $('#addhook').onclick = () => { const n = document.querySelectorAll('.hook').length; $('#hooks').appendChild(h(hookHtml({ kind: 'wecom', events: ['help', 'alarm'], enabled: true }, n))); };
     $('#savesettings').onclick = () => guard(async () => {
-      await api('PUT', '/settings', { webhooks: readHooks(), recording_retention_days: +$('#recdays').value, audit_retention_days: +$('#auddays').value });
+      await api('PUT', '/settings', { webhooks: readHooks(), recording_retention_days: +$('#recdays').value, audit_retention_days: +$('#auddays').value, allow_register: $('#allowreg').checked });
       toast('✅ 已保存');
     });
   } },

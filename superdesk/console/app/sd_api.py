@@ -1,11 +1,12 @@
 """super远程桌面 extensions used by our own client / scripts (no login: called from employee PCs)."""
+import re
 import time
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from . import db, notify
+from . import db, notify, security
 
 router = APIRouter(prefix="/api/superdesk")
 
@@ -122,3 +123,30 @@ def hello(body: HelloReq, req: Request):
 @router.get("/ping")
 def ping():
     return {"ok": True, "time": db.now()}
+
+
+class RegisterReq(BaseModel):
+    username: str
+    password: str
+    display_name: str = ""
+
+
+@router.post("/register")
+def register(b: RegisterReq, req: Request):
+    """Self-registration from the client login dialog (internal deployment: no approval step).
+    Same rules as accounts created in the console; admins can switch it off in 通知与设置."""
+    if str(db.get_setting("allow_register", True)).lower() in ("false", "0", ""):
+        raise HTTPException(status_code=403, detail="管理员已关闭客户端注册，请联系管理员创建账号")
+    rate_limit(req, "register", 3)
+    name = b.username.strip()
+    if not re.match(r"^[A-Za-z0-9_.@-]{2,32}$", name):
+        raise HTTPException(status_code=400, detail="用户名只能用字母、数字和 _ . @ -，2–32 位")
+    if len(b.password) < 8 or len(b.password) > 128:
+        raise HTTPException(status_code=400, detail="密码至少 8 位")
+    if db.one("SELECT 1 FROM users WHERE name=?", (name,)):
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    db.run("INSERT INTO users(name, display_name, email, note, password_hash, is_admin, status, created_at)"
+           " VALUES(?,?,?,?,?,?,?,?)",
+           (name, clip(b.display_name, 64), "", "客户端注册", security.hash_password(b.password), 0, 1, db.now()))
+    db.event("user", f"{name} 在客户端注册了账号（{client_ip(req)}）")
+    return {"ok": True}

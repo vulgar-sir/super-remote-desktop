@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../common.dart';
 import './dialog.dart';
 import './oidc_auth_status.dart';
+import 'package:flutter_hbb/superdesk/superdesk.dart' show sdRegisterLink;
 
 const kOpSvgList = [
   'github',
@@ -985,6 +986,11 @@ Future<bool?> _openLoginDialog() async {
             onLogin: onLogin,
             userFocusNode: userFocusNode,
           ),
+          sdRegisterLink(context, onRegistered: (u, p) {
+            username.text = u;
+            password.text = p;
+            onLogin();
+          }),
           thirdAuthWidget(),
         ],
       ),

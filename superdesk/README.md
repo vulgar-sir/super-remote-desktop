@@ -32,7 +32,8 @@
   - **设备页**：在线/离线胶囊 + 名称 + ⋮（备注名、收藏、复制ID、删除记录），预览卡“进入桌面 →”，
     动作栏 文件传输 / 观看模式 / 终端 / 端口映射 / 更多（远程摄像头、RDP、复制ID）；“观看模式”连接后自动打开仅观看，“进入桌面”恢复完全控制；
   - **设置**：标题 + 横向标签（常规 / 安全 / 网络 / 显示 / 账户 / 打印机 / 关于），白色卡片 + “开/关”开关。
-  主窗口最小 940×660。登录为 **账号密码**（控制台账号），不做短信/微信登录。
+  主窗口最小 940×660。登录为 **账号密码**（控制台账号），不做短信/微信登录；
+  登录框下方“没有账号？注册账号”可自助注册（无需审核，注册后自动登录，得到的是普通账号）。
 - **Windows 员工助手**：紧凑窗口——本设备ID + 验证码卡片、醒目的“请求 IT 协助”按钮、录屏提示、状态。
 - **被控时（连接管理窗口）**：对齐 UU 的“本机被控中”——蓝色卡片显示计时、对方名称和 ID、远程控制/传输文件等类型、连接时长，底部“断开远控”；全局主色统一为 #3A7BFC（会话工具栏、文件传输、对话框等 RustDesk 原有页面也随之统一）。
 - **Android**：底部 远程协助 / 设备 / 设置，页面大标题；“远控伙伴设备”卡片 →“输入设备验证码”弹窗 → 开始远控；
@@ -128,6 +129,7 @@ cat data/id_ed25519.pub               # 服务器公钥
 - **分组与访问策略**：先建分组再在“设备”里分组；策略随心跳自动下发。
   启用“仅公司账号电脑可连”前，确认 IT 的电脑已在客户端登录控制台账号，否则会把自己挡在外面。
 - **控制台账号**：管理员可登录后台；普通账号用于在客户端登录，以使用共享通讯录和设备列表。
+  客户端可自助注册普通账号（备注“客户端注册”，同一 IP 每分钟最多 3 次）；不需要时在 通知与设置 → 账号注册 关闭。
 - **共享通讯录**：按部门整理设备并授权给账号（只读/读写/完全控制），出现在客户端“地址簿”。
 - **审计**：连接（谁、何时、连了哪台、多久、备注）、文件传输、安全告警、会话录屏。
 - **通知与设置**：添加企业微信/钉钉/飞书群机器人 Webhook，选择推送的事件；录屏/审计保留天数。
@@ -190,6 +192,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/hbbs_http/record_upload.rs` | 录屏上传开关可由控制台策略 `superdesk-record-upload` 打开（上游此开关无人设置） |
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
+| `flutter/lib/common/widgets/login.dart` | 登录框下方挂“注册账号”入口（`sdRegisterLink`，调用控制台 `/api/superdesk/register`） |
 | `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |
 | `common.dart`（`MyTheme.accent` 改为 #3A7BFC）、`desktop/pages/server_page.dart`（被控卡片 `_sdUuCm`、断开远控按钮） | 被控窗口与全局主色 |
 | `desktop_tab_page.dart` + `tabbar_widget.dart`（`sdBarHeight`/`sdLeading`）、`desktop_setting_page.dart`（`sdTopTabs`、卡片/开关样式）、`main.dart`（窗口最小尺寸）、`mobile/pages/home_page.dart`（手机三标签）、`server_page.dart`（聊天按钮改为打开聊天页） | 新界面挂接 |

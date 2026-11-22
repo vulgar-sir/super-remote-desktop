@@ -447,7 +447,7 @@ def recording_delete(rid: int, u=admin):
 
 
 # ---------------------------------------------------------------- settings / notifications
-DEFAULT_SETTINGS = {"webhooks": [], "recording_retention_days": 30, "audit_retention_days": 365}
+DEFAULT_SETTINGS = {"webhooks": [], "recording_retention_days": 30, "audit_retention_days": 365, "allow_register": True}
 
 
 @router.get("/settings")
@@ -459,6 +459,7 @@ class SettingsReq(BaseModel):
     webhooks: list[dict] = []
     recording_retention_days: int = 30
     audit_retention_days: int = 365
+    allow_register: bool = True
 
 
 @router.put("/settings")
@@ -469,6 +470,7 @@ def settings_save(b: SettingsReq, u=admin):
     db.set_setting("webhooks", b.webhooks)
     db.set_setting("recording_retention_days", max(1, b.recording_retention_days))
     db.set_setting("audit_retention_days", max(7, b.audit_retention_days))
+    db.set_setting("allow_register", bool(b.allow_register))
     db.event("settings", f"{u['name']} 修改了系统设置")
     return {"ok": True}
 

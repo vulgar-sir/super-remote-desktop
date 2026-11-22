@@ -169,6 +169,12 @@ check("deploy report", J(b).get("ok") is True, b)
 s, b = call("POST", "/api/superdesk/hello", {"id": DEV, "flavor": "helper", "build": "202611221200", "platform": "windows"})
 dev = [x for x in J(call("GET", "/api/admin/devices?q=" + DEV, token=AT)[1])["data"] if x["id"] == DEV]
 check("hello records flavor/build", dev and dev[0]["flavor"] == "helper" and dev[0]["build"] == "202611221200", dev)
+s, b = call("POST", "/api/superdesk/register", {"username": "smokereg", "password": "SmokeReg1234"})
+check("client self-register", s == 200 and J(b).get("ok") is True, b)
+s, b = call("POST", "/api/superdesk/register", {"username": "smokereg", "password": "SmokeReg1234"})
+check("duplicate register rejected", s == 400 and "error" in J(b), b)
+s, b = call("POST", "/api/login", {"username": "smokereg", "password": "SmokeReg1234", "id": "smoke100003", "uuid": "x", "type": "account"})
+check("registered account logs in", J(b).get("type") == "access_token", b)
 s, b = call("GET", "/api/admin/overview", token=AT)
 d = J(b)
 check("admin overview", d["help_open"] >= 1 and d["devices"] >= 2, b[:300])
@@ -193,7 +199,7 @@ call("DELETE", f"/api/admin/recordings/{rec[0]['id']}", token=AT)
 call("DELETE", "/api/admin/groups/" + urllib.request.quote("smoke组"), token=AT)
 call("DELETE", f"/api/admin/address-books/{SG}", token=AT)
 for u in J(call("GET", "/api/admin/users", token=AT)[1]):
-    if u["name"] == "smokeuser":
+    if u["name"] in ("smokeuser", "smokereg"):
         call("DELETE", f"/api/admin/users/{u['id']}", token=AT)
 print(f"\n{'ALL PASSED' if not fails else f'{fails} FAILED'}")
 sys.exit(1 if fails else 0)

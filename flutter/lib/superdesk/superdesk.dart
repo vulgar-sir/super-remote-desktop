@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_hbb/common.dart' hide Dialog;
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
@@ -230,4 +231,113 @@ Widget superdeskHelperPanel(BuildContext context) {
       ],
     ),
   );
+}
+
+/// "没有账号？注册账号" under the login form. Registration needs no approval (internal deployment);
+/// on success the login form is filled in and submitted through [onRegistered].
+Widget sdRegisterLink(BuildContext context, {required void Function(String user, String pass) onRegistered}) {
+  return Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Text('没有账号？', style: TextStyle(fontSize: 13, color: Theme.of(context).hintColor)),
+      TextButton(
+        style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 4), minimumSize: const Size(0, 32)),
+        onPressed: () async {
+          final r = await _registerDialog();
+          if (r != null) onRegistered(r.$1, r.$2);
+        },
+        child: const Text('注册账号', style: TextStyle(fontSize: 13)),
+      ),
+    ]),
+  );
+}
+
+Future<String?> _postRegister(String user, String pass) async {
+  try {
+    final api = await _apiServer();
+    final resp = await http
+        .post(Uri.parse('$api/api/superdesk/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'username': user, 'password': pass}))
+        .timeout(const Duration(seconds: 15));
+    if (resp.statusCode == 200) return null;
+    String msg = '注册失败（${resp.statusCode}）';
+    try {
+      final d = jsonDecode(utf8.decode(resp.bodyBytes));
+      if (d is Map) msg = '${d['error'] ?? d['detail'] ?? msg}';
+    } catch (_) {}
+    return msg;
+  } catch (e) {
+    return '无法连接服务器：$e';
+  }
+}
+
+// The login dialog lives in dialogManager's overlay (above the navigator), so this one must too.
+Future<(String, String)?> _registerDialog() {
+  final user = TextEditingController();
+  final pass = TextEditingController();
+  final pass2 = TextEditingController();
+  String? error;
+  bool busy = false;
+  return gFFI.dialogManager.show<(String, String)>((setState, close, context) {
+    Future<void> submit() async {
+      if (busy) return;
+      final u = user.text.trim();
+      String? bad;
+      if (!RegExp(r'^[A-Za-z0-9_.@-]{2,32}$').hasMatch(u)) {
+        bad = '用户名只能用字母、数字和 _ . @ -，2–32 位';
+      } else if (pass.text.length < 8) {
+        bad = '密码至少 8 位';
+      } else if (pass.text != pass2.text) {
+        bad = '两次输入的密码不一致';
+      }
+      if (bad != null) {
+        setState(() => error = bad);
+        return;
+      }
+      setState(() {
+        busy = true;
+        error = null;
+      });
+      final err = await _postRegister(u, pass.text);
+      if (err == null) {
+        close((u, pass.text));
+        return;
+      }
+      setState(() {
+        busy = false;
+        error = err;
+      });
+    }
+
+    InputDecoration deco(String label) => InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+        );
+    return CustomAlertDialog(
+      title: const Text('注册账号'),
+      contentBoxConstraints: const BoxConstraints(minWidth: 360, maxWidth: 360),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const SizedBox(height: 4),
+        TextField(controller: user, autofocus: true, decoration: deco('用户名')),
+        const SizedBox(height: 12),
+        TextField(controller: pass, obscureText: true, decoration: deco('密码（至少 8 位）')),
+        const SizedBox(height: 12),
+        TextField(controller: pass2, obscureText: true, decoration: deco('确认密码')),
+        if (busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          ),
+      ]),
+      actions: [
+        dialogButton('Cancel', onPressed: busy ? null : () => close(), isOutline: true),
+        dialogButton('注册并登录', onPressed: busy ? null : submit),
+      ],
+      onSubmit: submit,
+      onCancel: busy ? null : () => close(),
+    );
+  });
 }
