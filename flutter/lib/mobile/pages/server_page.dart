@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_home_page.dart';
 import 'package:flutter_hbb/mobile/widgets/dialog.dart';
 import 'package:flutter_hbb/models/chat_model.dart';
+import 'package:flutter_hbb/superdesk/mobile_home.dart' show sdUseMobileHome, sdOpenChat;
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
@@ -735,6 +736,7 @@ class ConnectionManager extends StatelessWidget {
                                   onPressed: () {
                                     gFFI.chatModel.changeCurrentKey(
                                         MessageKey(client.peerId, client.id));
+                                    if (sdUseMobileHome) return sdOpenChat(context);
                                     final bar = navigationBarKey.currentWidget;
                                     if (bar != null) {
                                       bar as BottomNavigationBar;
@@ -863,10 +865,12 @@ class PaddingCard extends StatelessWidget {
                   titleIcon?.marginOnly(right: 10) ?? const SizedBox.shrink(),
                   Expanded(
                     child: Text(title!,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.merge(TextStyle(fontWeight: FontWeight.bold))),
+                        style: sdUseMobileHome
+                            ? TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: SdPalette(context).text)
+                            : Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.merge(TextStyle(fontWeight: FontWeight.bold))),
                   )
                 ],
               )));
@@ -878,13 +882,16 @@ class PaddingCard extends StatelessWidget {
           color: SdPalette(context).card,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: SdPalette(context).line),
+            borderRadius: BorderRadius.circular(sdUseMobileHome ? 12 : 14),
+            side: sdUseMobileHome ? BorderSide.none : BorderSide(color: SdPalette(context).line),
           ),
-          margin: const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
+          margin: sdUseMobileHome
+              ? const EdgeInsets.only(top: 16)
+              : const EdgeInsets.fromLTRB(12.0, 10.0, 12.0, 0),
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
+            padding: sdUseMobileHome
+                ? const EdgeInsets.fromLTRB(16, 12, 16, 12)
+                : const EdgeInsets.symmetric(vertical: 15.0, horizontal: 20.0),
             child: Column(
               children: children,
             ),

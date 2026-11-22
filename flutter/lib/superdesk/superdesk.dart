@@ -41,6 +41,9 @@ Future<String> _apiServer() async {
   return api;
 }
 
+/// API server without the trailing slash ('' when none is configured).
+Future<String> sdApiServer() => _apiServer();
+
 int _buildNum(String s) =>
     int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 

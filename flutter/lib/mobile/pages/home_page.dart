@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/mobile/pages/server_page.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
+import 'package:flutter_hbb/superdesk/mobile_home.dart';
 import 'package:flutter_hbb/superdesk/superdesk.dart';
 import 'package:flutter_hbb/superdesk/theme.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
@@ -51,6 +52,10 @@ class HomePageState extends State<HomePage> {
 
   void initPages() {
     _pages.clear();
+    if (sdUseMobileHome) {
+      _pages.addAll(sdMobilePages(onShowDevices: () => setState(() => _selectedIndex = 1)));
+      return;
+    }
     if (!bind.isIncomingOnly()) {
       _pages.add(ConnectionPage(
         appBarActions: [],
@@ -77,8 +82,8 @@ class HomePageState extends State<HomePage> {
           return false;
         },
         child: Scaffold(
-          backgroundColor: SdPalette(context).page,
-          appBar: AppBar(
+          backgroundColor: sdUseMobileHome ? SdPalette(context).side : SdPalette(context).page,
+          appBar: sdUseMobileHome ? null : AppBar(
             centerTitle: true,
             title: appTitle(),
             actions: _pages.elementAt(_selectedIndex).appBarActions,
@@ -91,7 +96,7 @@ class HomePageState extends State<HomePage> {
             shape: Border(bottom: BorderSide(color: SdPalette(context).line)),
           ),
           bottomNavigationBar: BottomNavigationBar(
-            backgroundColor: SdPalette(context).side,
+            backgroundColor: sdUseMobileHome ? SdPalette(context).card : SdPalette(context).side,
             key: navigationBarKey,
             items: _pages
                 .map((page) =>

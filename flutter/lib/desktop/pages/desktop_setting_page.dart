@@ -20,6 +20,7 @@ import 'package:flutter_hbb/models/printer_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/shortcut_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/superdesk/theme.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -83,7 +84,11 @@ class DesktopSettingPage extends StatefulWidget {
     SettingsTabKey.about,
   ];
 
-  DesktopSettingPage({Key? key, required this.initialTabkey}) : super(key: key);
+  /// super远程桌面: page title + horizontal tabs instead of the left tab list (embedded in the
+  /// main window's own sidebar layout).
+  final bool sdTopTabs;
+
+  DesktopSettingPage({Key? key, required this.initialTabkey, this.sdTopTabs = false}) : super(key: key);
 
   @override
   State<DesktopSettingPage> createState() =>
@@ -276,6 +281,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (widget.sdTopTabs) return _sdTopTabsLayout(context);
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
       body: _buildBlock(
@@ -2675,6 +2681,9 @@ Widget _Card(
     {required String title,
     required List<Widget> children,
     List<Widget>? title_suffix}) {
+  if (_sdUuStyle) {
+    return _sdCard(title: title, children: children, titleSuffix: title_suffix);
+  }
   return Row(
     children: [
       Flexible(
@@ -2753,6 +2762,10 @@ Widget _OptionCheckBox(
     enabled = false;
   }
 
+  if (_sdUuStyle) {
+    return _sdOptionRow(context, label, ref, enabled && !isOptFixed ? onChanged : null,
+        checkedIcon: checkedIcon, trailing: trailing);
+  }
   return GestureDetector(
     child: Obx(
       () => Row(
@@ -3395,3 +3408,123 @@ void changeSocks5Proxy() async {
 }
 
 //#endregion
+
+// super远程桌面: UU-remote-like settings -- page title with horizontal tabs, white cards, and
+// switch rows in place of check boxes. Only the presentation differs; every option still goes
+// through the same getters/setters as above. `false` restores the upstream look.
+const bool _sdUuStyle = true;
+
+Widget _sdCard({required String title, required List<Widget> children, List<Widget>? titleSuffix}) {
+  return Builder(builder: (context) {
+    final p = SdPalette(context);
+    return Align(
+      alignment: Alignment.topLeft,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(40, 14, 40, 0),
+        constraints: const BoxConstraints(maxWidth: 820),
+        decoration: BoxDecoration(
+            color: p.card, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.line)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+            child: Row(children: [
+              Expanded(
+                  child: Text(translate(title),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text))),
+              ...?titleSuffix,
+            ]),
+          ),
+          ...children.map((e) => Padding(padding: const EdgeInsets.fromLTRB(12, 0, 16, 0), child: e)),
+          const SizedBox(height: 10),
+        ]),
+      ),
+    );
+  });
+}
+
+Widget _sdOptionRow(BuildContext context, String label, RxBool ref, Function(bool?)? onChanged,
+    {Icon? checkedIcon, Widget? trailing}) {
+  final p = SdPalette(context);
+  return Obx(() => InkWell(
+        onTap: onChanged == null ? null : () => onChanged(!ref.value),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 4, 0, 4),
+          child: Row(children: [
+            Expanded(
+              child: Row(children: [
+                Flexible(
+                  child: Text(translate(label),
+                      style: TextStyle(fontSize: 14, color: onChanged == null ? p.hint : p.text)),
+                ),
+                if (trailing != null) trailing,
+              ]),
+            ),
+            if (ref.value && checkedIcon != null) checkedIcon.marginOnly(right: 6),
+            sdSwitch(p, ref.value, onChanged == null ? null : (v) => onChanged(v)),
+          ]),
+        ),
+      ));
+}
+
+extension _SdTopTabs on _DesktopSettingPageState {
+  Widget _sdTopTabsLayout(BuildContext context) {
+    final p = SdPalette(context);
+    final tabs = _settingTabs();
+    return Container(
+      color: p.page,
+      child: _buildBlock(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(40, 26, 40, 0),
+              child: Text(translate('Settings'),
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: p.text)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 16, 40, 0),
+              child: Obx(() => Wrap(
+                    children: tabs.map((tab) {
+                      final selected = tab.key == selectedTab.value;
+                      return InkWell(
+                        onTap: () {
+                          if (selectedTab.value != tab.key) {
+                            final index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+                            if (index == -1) return;
+                            controller.jumpToPage(index);
+                          }
+                          selectedTab.value = tab.key;
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text(translate(tab.label),
+                                style: TextStyle(
+                                    fontSize: 15.5,
+                                    color: selected ? p.text : p.muted,
+                                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
+                            const SizedBox(height: 7),
+                            Container(
+                                width: 18,
+                                height: 3,
+                                decoration: BoxDecoration(
+                                    color: selected ? kSdAccent : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(2))),
+                          ]),
+                        ),
+                      );
+                    }).toList(),
+                  )),
+            ),
+            Expanded(
+              child: PageView(
+                controller: controller,
+                physics: NeverScrollableScrollPhysics(),
+                children: _children(),
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}

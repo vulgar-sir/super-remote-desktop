@@ -6,6 +6,7 @@ import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
+import 'package:flutter_hbb/superdesk/desktop_home.dart';
 import 'package:get/get.dart';
 import 'package:window_manager/window_manager.dart';
 // import 'package:flutter/services.dart';
@@ -93,10 +94,13 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
   Widget build(BuildContext context) {
     final tabWidget = Container(
         child: Scaffold(
-            backgroundColor: Theme.of(context).colorScheme.background,
+            backgroundColor: sdTitleBarColor(context),
             body: DesktopTab(
               controller: tabController,
-              tail: Offstage(
+              sdBarHeight: sdTitleBarHeight,
+              showMaximize: sdTitleBarShowMaximize,
+              sdLeading: sdTitleBarLeading(context),
+              tail: sdTitleBarTail(context) ?? Offstage(
                 offstage: bind.isIncomingOnly() || bind.isDisableSettings(),
                 child: ActionIcon(
                   message: 'Settings',

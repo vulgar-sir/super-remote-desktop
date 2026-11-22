@@ -1,5 +1,5 @@
 diff --git a/src/rendezvous_server.rs b/src/rendezvous_server.rs
-index dff45eb..1478706 100644
+index dff45eb..d491305 100644
 --- a/src/rendezvous_server.rs
 +++ b/src/rendezvous_server.rs
 @@ -53,6 +53,8 @@ type WsSink = SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, tungsteni
@@ -66,7 +66,7 @@ index dff45eb..1478706 100644
          if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(bytes) {
              match msg_in.union {
                  Some(rendezvous_message::Union::PunchHoleRequest(ph)) => {
-@@ -521,12 +555,20 @@ impl RendezvousServer {
+@@ -521,12 +555,26 @@ impl RendezvousServer {
                              rr.relay_server = self.get_relay_server(addr.ip(), addr_b.ip());
                          }
                      }
@@ -84,10 +84,16 @@ index dff45eb..1478706 100644
 +                    self.handle_ice_candidate(ice, addr).await;
 +                    return true;
 +                }
++                Some(rendezvous_message::Union::OnlineRequest(or)) => {
++                    // super远程桌面: online states over TCP/WebSocket (upstream answers them only on
++                    // the NAT-test port, which the single public port does not expose)
++                    let msg_out = self.online_response(&or.peers).await;
++                    Self::send_to_sink(sink, msg_out).await;
++                }
                  Some(rendezvous_message::Union::LocalAddr(la)) => {
                      allow_err!(self.handle_local_addr(la, addr, None).await);
                  }
-@@ -545,19 +587,161 @@ impl RendezvousServer {
+@@ -545,19 +593,161 @@ impl RendezvousServer {
                      msg_out.set_test_nat_response(res);
                      Self::send_to_sink(sink, msg_out).await;
                  }
@@ -252,7 +258,7 @@ index dff45eb..1478706 100644
      }
  
      #[inline]
-@@ -624,11 +808,15 @@ impl RendezvousServer {
+@@ -624,11 +814,15 @@ impl RendezvousServer {
              socket_addr: AddrMangle::encode(addr).into(),
              pk: self.get_pk(&phs.version, phs.id).await,
              relay_server: phs.relay_server.clone(),
@@ -268,7 +274,7 @@ index dff45eb..1478706 100644
          msg_out.set_punch_hole_response(p);
          if let Some(socket) = socket {
              socket.send(&msg_out, addr_a).await?;
-@@ -767,6 +955,7 @@ impl RendezvousServer {
+@@ -767,6 +961,7 @@ impl RendezvousServer {
                      socket_addr,
                      nat_type: ph.nat_type,
                      relay_server,
@@ -276,7 +282,32 @@ index dff45eb..1478706 100644
                      ..Default::default()
                  });
              }
-@@ -829,6 +1018,9 @@ impl RendezvousServer {
+@@ -810,6 +1005,24 @@ impl RendezvousServer {
+         Ok(())
+     }
+ 
++    // super远程桌面: same answer as handle_online_request, for the TCP/WebSocket path
++    async fn online_response(&mut self, peers: &[String]) -> RendezvousMessage {
++        let mut states = BytesMut::zeroed((peers.len() + 7) / 8);
++        for (i, peer_id) in peers.iter().enumerate() {
++            if let Some(peer) = self.pm.get_in_memory(peer_id).await {
++                if (peer.read().await.last_reg_time.elapsed().as_millis() as i64) < REG_TIMEOUT {
++                    states[i / 8] |= 0x01 << (7 - i % 8);
++                }
++            }
++        }
++        let mut msg_out = RendezvousMessage::new();
++        msg_out.set_online_response(OnlineResponse {
++            states: states.into(),
++            ..Default::default()
++        });
++        msg_out
++    }
++
+     #[inline]
+     async fn send_to_tcp(&mut self, msg: RendezvousMessage, addr: SocketAddr) {
+         let mut tcp = self.tcp_punch.lock().await.remove(&try_into_v4(addr));
+@@ -829,6 +1042,9 @@ impl RendezvousServer {
                      Sink::Ws(ws) => {
                          allow_err!(ws.send(tungstenite::Message::Binary(bytes)).await);
                      }
@@ -286,7 +317,7 @@ index dff45eb..1478706 100644
                  }
              }
          }
-@@ -1158,10 +1350,10 @@ impl RendezvousServer {
+@@ -1158,10 +1374,10 @@ impl RendezvousServer {
                      .or_else(|| headers.get("X-Forwarded-For"))
                      .and_then(|header_value| header_value.to_str().ok());
                  if let Some(ip) = real_ip {
@@ -301,7 +332,7 @@ index dff45eb..1478706 100644
                      }
                  }
                  Ok(response)
-@@ -1188,6 +1380,18 @@ impl RendezvousServer {
+@@ -1188,6 +1404,18 @@ impl RendezvousServer {
          if sink.is_none() {
              self.tcp_punch.lock().await.remove(&try_into_v4(addr));
          }

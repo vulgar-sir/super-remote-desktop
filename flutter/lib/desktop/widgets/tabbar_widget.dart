@@ -252,6 +252,10 @@ class DesktopTab extends StatefulWidget {
   final Color? selectedTabBackgroundColor;
   final Color? unSelectedTabBackgroundColor;
   final Color? selectedBorderColor;
+  // super远程桌面: main-window title bar -- taller bar without the bottom divider, and an own
+  // logo/title widget. Both null keep the default bar.
+  final double? sdBarHeight;
+  final Widget? sdLeading;
 
   final DesktopTabController controller;
 
@@ -277,6 +281,8 @@ class DesktopTab extends StatefulWidget {
     this.selectedTabBackgroundColor,
     this.unSelectedTabBackgroundColor,
     this.selectedBorderColor,
+    this.sdBarHeight,
+    this.sdLeading,
   }) : super(key: key);
 
   static RxString tablabelGetter(String peerId) {
@@ -524,6 +530,9 @@ class _DesktopTabState extends State<DesktopTab>
       Obx(() {
         if (stateGlobal.showTabBar.isTrue &&
             !(kUseCompatibleUiMode && isHideSingleItem())) {
+          if (widget.sdBarHeight != null) {
+            return SizedBox(height: widget.sdBarHeight, child: _buildBar());
+          }
           final showBottomDivider = _showTabBarBottomDivider(tabType);
           return SizedBox(
             height: _kTabBarHeight,
@@ -643,7 +652,7 @@ class _DesktopTabState extends State<DesktopTab>
                         )),
                     Offstage(
                       offstage: kUseCompatibleUiMode || isMacOS,
-                      child: Row(children: [
+                      child: widget.sdLeading ?? Row(children: [
                         Offstage(
                           offstage: !showLogo,
                           child: loadIcon(16),

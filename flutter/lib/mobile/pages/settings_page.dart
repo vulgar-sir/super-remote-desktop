@@ -23,6 +23,7 @@ import '../widgets/dialog.dart';
 import 'home_page.dart';
 import 'mobile_keyboard_shortcuts_page.dart';
 import 'scan_page.dart';
+import 'package:flutter_hbb/superdesk/mobile_home.dart' show sdSettingsPlatform, sdSettingsLightTheme;
 
 class SettingsPage extends StatefulWidget implements PageShape {
   @override
@@ -734,6 +735,8 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
     final hideSecuritySettings =
         bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) == 'Y';
     final settings = SettingsList(
+      platform: sdSettingsPlatform,
+      lightTheme: sdSettingsLightTheme(context),
       sections: [
         customClientSection,
         if (!bind.isDisableAccount())

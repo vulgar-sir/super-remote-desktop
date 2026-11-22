@@ -21,17 +21,27 @@
 
 ## 客户端界面
 
-参考国内主流远控的简洁风格重新设计（原创设计，自有品牌与配色），只改界面，RustDesk 原有功能全部保留：
+布局、文案和交互流程对齐 **UU远程**（按其桌面版 4.48 与手机版宣传图逐页对照），品牌、Logo 与图标为自有素材；
+只改界面，RustDesk 原有功能全部保留：
 
-- **Windows 完整版**：左侧导航（远程控制 / 设备列表 / 设置）；“本机设备”大卡片显示 **设备代码 + 验证码**
-  （默认隐藏，可显示 / 复制 / 更换）；“远程控制伙伴设备”输入框 + 远程控制 / 传文件；最近连接卡片；
-  安装、升级等提示统一为浅色横幅。设备列表与设置页沿用 RustDesk 原功能（收藏、局域网发现、通讯录、分组等）。
-- **Windows 员工助手**：紧凑窗口——设备代码 + 验证码卡片、醒目的“请求 IT 协助”按钮、录屏提示、状态。
-- **Android**：浅色顶栏（图标 + 名称），“远程控制伙伴设备”卡片 + 大按钮；“共享屏幕”页的“本机设备”卡片与桌面一致。
-- 验证码默认 **6 位纯数字**（便于电话里报给对方，可在设置中修改）；明暗主题均适配。
+- **Windows 完整版**：48px 标题栏（Logo + 名称，右侧账号 / 菜单：下载中心、如何添加设备、关于、检查更新）；
+  浅灰侧栏分组 **我的设备**（最近 6 台，带在线绿点）/ **全部设备** / **远程协助**（开始协助、收藏设备）/ **设置**；
+  - **远程协助**：“本设备”卡片（允许他人远程协助开关、本设备ID、验证方式下拉、验证码查看/刷新、复制并分享）
+    + “远控伙伴设备”卡片（伙伴的设备ID + 连接）；
+  - **全部设备**：按“电脑 / 手机/平板”分组（含本机），点 › 进设备页；**收藏设备**：空状态 + 添加收藏设备；
+  - **设备页**：在线/离线胶囊 + 名称 + ⋮（备注名、收藏、复制ID、删除记录），预览卡“进入桌面 →”，
+    动作栏 文件传输 / 远程摄像头 / 终端 / 端口映射 / 更多（RDP、复制ID）；
+  - **设置**：标题 + 横向标签（常规 / 安全 / 网络 / 显示 / 账户 / 打印机 / 关于），白色卡片 + “开/关”开关。
+  主窗口最小 940×660。登录为 **账号密码**（控制台账号），不做短信/微信登录。
+- **Windows 员工助手**：紧凑窗口——本设备ID + 验证码卡片、醒目的“请求 IT 协助”按钮、录屏提示、状态。
+- **Android**：底部 远程协助 / 设备 / 设置，页面大标题；“远控伙伴设备”卡片 →“输入设备验证码”弹窗 → 开始远控；
+  “本设备”卡片（允许他人远程协助开关、设备ID、验证码、复制并分享）+ 原有连接管理与权限卡片；
+  设备页（预览卡 + 文件传输 / 远程摄像头 / 终端 / 更多）。
+- 验证码默认 **6 位纯数字**（便于电话里报给对方，可在设置中修改），每次被远控后自动更换。
+- 在线状态：单端口模式下 hbbs 原本只在 NAT 测试端口回答在线查询，补丁让它在 WebSocket 上也回答，设备列表才能显示在线。
 
-代码集中在 `flutter/lib/superdesk/`（`theme.dart` 配色与组件、`desktop_home.dart` 桌面主界面），
-对上游文件只有少量挂接改动（见文末改动表），升级 RustDesk 时容易合并。
+代码集中在 `flutter/lib/superdesk/`（`theme.dart` 配色与组件、`desktop_home.dart` 桌面主界面、
+`mobile_home.dart` 手机主界面、`devices.dart` 设备数据），对上游文件只有少量挂接改动（见文末改动表）。
 
 ## 架构
 
@@ -179,7 +189,8 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/hbbs_http/record_upload.rs` | 录屏上传开关可由控制台策略 `superdesk-record-upload` 打开（上游此开关无人设置） |
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
-| `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`（新增） | 新界面：配色组件、桌面主界面、提示横幅、员工助手卡片 |
+| `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |
+| `desktop_tab_page.dart` + `tabbar_widget.dart`（`sdBarHeight`/`sdLeading`）、`desktop_setting_page.dart`（`sdTopTabs`、卡片/开关样式）、`main.dart`（窗口最小尺寸）、`mobile/pages/home_page.dart`（手机三标签）、`server_page.dart`（聊天按钮改为打开聊天页） | 新界面挂接 |
 | `desktop_home_page.dart`（build / buildInstallCard / buildLeftPane 挂接）、`mobile/pages/connection_page.dart`、`server_page.dart`、`home_page.dart` | 新界面挂接：只替换外观，原有逻辑不变 |
 | `flutter/windows/runner/Runner.rc`、`libs/portable/Cargo.toml` | 程序名称/描述（构建时按版本替换） |
 | `flutter/android/app/build.gradle`、`AndroidManifest.xml` | 包名 `com.superdesk.remote`（可与官方 RustDesk 共存）、应用名 |
