@@ -365,7 +365,10 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
             SdOnline.want(peers.map((x) => x.id).toList());
             final online = SdOnline.ids.toSet();
             final active = SdSessions.peers.keys.toSet();
-            final mine = peers.take(6).toList();
+            final mine = [
+              ...peers.where((x) => online.contains(x.id)),
+              ...peers.where((x) => !online.contains(x.id)),
+            ].take(6).toList();
             return ListView(padding: const EdgeInsets.only(top: 8), children: [
               _section(p, SdGlyph.devices, '我的设备', _myOpen, () => setState(() => _myOpen = !_myOpen)),
               if (_myOpen) ...[
@@ -479,7 +482,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
           onTap: onTap,
           child: SizedBox(
             height: 36,
-            child: Stack(children: [
+            child: Stack(alignment: AlignmentDirectional.centerStart, children: [
               if (selected)
                 Positioned(
                   left: 0,

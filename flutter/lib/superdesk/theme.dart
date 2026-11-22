@@ -346,9 +346,6 @@ class _GlyphPainter extends CustomPainter {
   final Color line;
   _GlyphPainter(this.glyph, this.line);
 
-  static const _dark = Color(0xFF3A7BFC);
-  static const _light = Color(0xFF8DB6FF);
-
   static RRect _rr(double l, double t, double r, double b, double rad) =>
       RRect.fromLTRBR(l, t, r, b, Radius.circular(rad));
 
@@ -364,42 +361,62 @@ class _GlyphPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     Paint fill(Color c) => Paint()..color = c;
+    final grad = Paint()
+      ..shader = const LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF4F8EFF), Color(0xFF2E6FF5)])
+          .createShader(const Rect.fromLTWH(0, 0, 20, 20));
+    final light = Paint()
+      ..shader = const LinearGradient(
+              begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF9CC2FF), Color(0xFF7DAEFF)])
+          .createShader(const Rect.fromLTWH(0, 0, 20, 20));
+    Path corner(Offset a, Offset c, Offset b) => Path()
+      ..moveTo(a.dx, a.dy)
+      ..lineTo(c.dx + (a.dx - c.dx).sign * 1.6, c.dy + (a.dy - c.dy).sign * 1.6)
+      ..quadraticBezierTo(c.dx, c.dy, c.dx + (b.dx - c.dx).sign * 1.6, c.dy + (b.dy - c.dy).sign * 1.6)
+      ..lineTo(b.dx, b.dy);
     switch (glyph) {
-      case SdGlyph.devices: // monitor + phone, outlined
-        canvas.drawRRect(_rr(1.5, 3.5, 13.5, 12.5, 1.6), stroke);
-        canvas.drawLine(const Offset(5, 16), const Offset(9.5, 16), stroke);
-        canvas.drawRRect(_rr(11.5, 8, 18.5, 17, 1.6), fill(Colors.transparent));
-        canvas.drawRRect(_rr(11.5, 8, 18.5, 17, 1.6), stroke);
+      case SdGlyph.devices: // open laptop frame with base + a second screen, outlined
+        canvas.drawPath(corner(const Offset(9.2, 4.2), const Offset(3.6, 4.2), const Offset(3.6, 12.4)), stroke);
+        canvas.drawLine(const Offset(2, 15.4), const Offset(8, 15.4), stroke..strokeWidth = 1.6);
+        stroke.strokeWidth = 1.35;
+        canvas.drawRRect(_rr(9.6, 8.8, 18.2, 16.2, 1.6), stroke);
         break;
-      case SdGlyph.assist: // two rounded squares, outlined
-        canvas.drawRRect(_rr(2, 3, 9.5, 10.5, 2), stroke);
-        canvas.drawRRect(_rr(10.5, 9.5, 18, 17, 2), stroke);
-        canvas.drawLine(const Offset(2.5, 14.5), const Offset(6.5, 14.5), stroke);
-        canvas.drawLine(const Offset(13.5, 5.5), const Offset(17.5, 5.5), stroke);
+      case SdGlyph.assist: // corner brackets + two small boxes, outlined
+        canvas.drawPath(corner(const Offset(8.4, 3.8), const Offset(3.4, 3.8), const Offset(3.4, 8.6)), stroke);
+        canvas.drawRRect(_rr(11.4, 3.4, 17.2, 8.6, 1.8), stroke);
+        canvas.drawRRect(_rr(3, 11.4, 8.8, 16.4, 1.8), stroke);
+        canvas.drawPath(corner(const Offset(16.8, 11.4), const Offset(16.8, 16.4), const Offset(11.8, 16.4)), stroke);
         break;
       case SdGlyph.allDevices: // 2x2 dots, two-tone
-        canvas.drawCircle(const Offset(6, 6), 4, fill(_dark));
-        canvas.drawCircle(const Offset(14, 6), 4, fill(_light));
-        canvas.drawCircle(const Offset(6, 14), 4, fill(_light));
-        canvas.drawCircle(const Offset(14, 14), 4, fill(_dark));
+        canvas.drawCircle(const Offset(5.8, 5.8), 4, grad);
+        canvas.drawCircle(const Offset(14.2, 5.8), 4, light);
+        canvas.drawCircle(const Offset(5.8, 14.2), 4, light);
+        canvas.drawCircle(const Offset(14.2, 14.2), 4, grad);
         break;
-      case SdGlyph.startAssist: // overlapping squares, two-tone
-        canvas.drawRRect(_rr(8, 2, 18.5, 12.5, 2.2), fill(_dark));
-        canvas.drawRRect(_rr(1.5, 7.5, 12, 18, 2.6), fill(Colors.white));
-        canvas.drawRRect(_rr(2.5, 8.5, 11, 17, 1.8), fill(_light));
+      case SdGlyph.startAssist: // filled boxes on one diagonal, thick brackets on the other
+        final br = Paint()
+          ..shader = grad.shader
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.1
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+        canvas.drawPath(corner(const Offset(8.4, 3.4), const Offset(3, 3.4), const Offset(3, 8.4)), br);
+        canvas.drawRRect(_rr(10.8, 1.8, 18.4, 9, 2.2), grad);
+        canvas.drawRRect(_rr(1.8, 10.8, 9.2, 18.2, 2.2), grad);
+        canvas.drawPath(corner(const Offset(17, 11.6), const Offset(17, 16.8), const Offset(11.6, 16.8)), br);
         break;
       case SdGlyph.favorites: // bookmark with a star
         final b = Path()
-          ..moveTo(4, 3.2)
-          ..quadraticBezierTo(4, 2, 5.2, 2)
-          ..lineTo(14.8, 2)
-          ..quadraticBezierTo(16, 2, 16, 3.2)
-          ..lineTo(16, 18)
-          ..lineTo(10, 14.2)
-          ..lineTo(4, 18)
+          ..moveTo(3.4, 3.4)
+          ..quadraticBezierTo(3.4, 1.8, 5, 1.8)
+          ..lineTo(15, 1.8)
+          ..quadraticBezierTo(16.6, 1.8, 16.6, 3.4)
+          ..lineTo(16.6, 18.4)
+          ..lineTo(10, 14.6)
+          ..lineTo(3.4, 18.4)
           ..close();
-        canvas.drawPath(b, fill(_dark));
-        canvas.drawPath(_star(const Offset(10, 8.6), 3.4, 1.5), fill(Colors.white));
+        canvas.drawPath(b, grad);
+        canvas.drawPath(_star(const Offset(10, 8.4), 3.5, 1.55), fill(const Color(0xFFDDEBFF)));
         break;
       case SdGlyph.emptyBox: // open box with a star (empty state)
         const c1 = Color(0xFFB9D6FB), c2 = Color(0xFFD7E8FD), c3 = Color(0xFF9CC5F7);
