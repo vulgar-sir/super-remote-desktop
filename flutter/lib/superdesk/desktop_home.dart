@@ -185,7 +185,7 @@ final sdHomeSettingsRequest = Rxn<SettingsTabKey>();
 Widget _accountButton(SdPalette p) => Obx(() {
       final name = gFFI.userModel.userName.value;
       if (name.isEmpty) {
-        return sdIconButton(p, Icons.person_outline_rounded, '登录账号', () => loginDialog(), color: p.text, size: 21);
+        return sdIconButton(p, Icons.person_outline, '登录账号', () => loginDialog(), color: p.text, size: 20);
       }
       return PopupMenuButton<int>(
         tooltip: name,
@@ -205,7 +205,7 @@ Widget _accountButton(SdPalette p) => Obx(() {
 Widget _menuButton(BuildContext context, SdPalette p) => PopupMenuButton<int>(
       tooltip: '菜单',
       offset: const Offset(0, 40),
-      icon: Icon(Icons.menu_rounded, color: p.text, size: 21),
+      icon: Icon(Icons.menu, color: p.text, size: 20),
       itemBuilder: (_) => [
         _menuItem(1, Icons.download_for_offline_outlined, '下载中心'),
         _menuItem(2, Icons.help_outline_rounded, '如何添加设备'),
@@ -281,6 +281,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
   void initState() {
     super.initState();
     SdOnline.start();
+    SdSessions.start();
     bind.mainLoadRecentPeers();
     bind.mainLoadFavPeers();
     _settingsWorker = ever<SettingsTabKey?>(sdHomeSettingsRequest, (tab) {
@@ -363,14 +364,16 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
             final peers = sdAllPeers();
             SdOnline.want(peers.map((x) => x.id).toList());
             final online = SdOnline.ids.toSet();
+            final active = SdSessions.peers.keys.toSet();
             final mine = peers.take(6).toList();
-            return ListView(padding: const EdgeInsets.only(top: 6), children: [
-              _section(p, Icons.devices_outlined, '我的设备', _myOpen, () => setState(() => _myOpen = !_myOpen)),
+            return ListView(padding: const EdgeInsets.only(top: 8), children: [
+              _section(p, SdGlyph.devices, '我的设备', _myOpen, () => setState(() => _myOpen = !_myOpen)),
               if (_myOpen) ...[
                 ...mine.map((x) => _item(
                       p,
                       selected: _page == _Page.device && _deviceId == x.id,
                       leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const SizedBox(width: 8),
                         Container(
                             width: 6,
                             height: 6,
@@ -378,35 +381,29 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
                                 color: online.contains(x.id) ? kSdOnline : Colors.transparent,
                                 shape: BoxShape.circle)),
                         const SizedBox(width: 10),
-                        sdPlatformTile(x.platform, size: 22, online: online.contains(x.id)),
+                        sdPlatformTile(x.platform, size: 20, online: online.contains(x.id)),
                       ]),
                       label: sdPeerName(x),
                       dim: !online.contains(x.id),
+                      trailing: active.contains(x.id) ? _sessionBadge() : null,
                       onTap: () => _go(_Page.device, device: x.id),
                     )),
                 _item(p,
                     selected: _page == _Page.all,
-                    leading: const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Icon(Icons.apps_rounded, color: kSdAccent, size: 22)),
+                    leading: _entryIcon(SdGlyph.allDevices),
                     label: '全部设备',
                     onTap: () => _go(_Page.all)),
               ],
-              _section(p, Icons.screen_share_outlined, '远程协助', _assistOpen,
-                  () => setState(() => _assistOpen = !_assistOpen)),
+              _section(p, SdGlyph.assist, '远程协助', _assistOpen, () => setState(() => _assistOpen = !_assistOpen)),
               if (_assistOpen) ...[
                 _item(p,
                     selected: _page == _Page.assist,
-                    leading: const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Icon(Icons.connected_tv_rounded, color: kSdAccent, size: 22)),
+                    leading: _entryIcon(SdGlyph.startAssist),
                     label: '开始协助',
                     onTap: () => _go(_Page.assist)),
                 _item(p,
                     selected: _page == _Page.fav,
-                    leading: const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Icon(Icons.bookmark_rounded, color: kSdAccent, size: 22)),
+                    leading: _entryIcon(SdGlyph.favorites),
                     label: '收藏设备',
                     onTap: () => _go(_Page.fav)),
               ],
@@ -416,29 +413,48 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
       ),
       if (!bind.isDisableSettings()) ...[
         Divider(height: 1, color: p.dark ? p.line : const Color(0xFFE1E6E8)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         _item(p,
             selected: _page == _Page.settings,
-            leading: Icon(Icons.settings_outlined, color: p.text, size: 20),
+            leading: Padding(
+                padding: const EdgeInsets.only(left: 0.5),
+                child: Icon(Icons.settings_outlined, color: p.text, size: 19)),
+            gap: 7,
             label: '设置',
             onTap: () => _go(_Page.settings)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
       ],
     ]);
   }
 
-  Widget _section(SdPalette p, IconData icon, String label, bool open, VoidCallback toggle) {
+  /// "open session" badge next to a device: screen glyph + count, like the reference.
+  Widget _sessionBadge() => Container(
+        margin: const EdgeInsets.only(left: 6, right: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(
+            border: Border.all(color: kSdAccent, width: 1), borderRadius: BorderRadius.circular(4)),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.connected_tv_outlined, size: 12, color: kSdAccent),
+          SizedBox(width: 2),
+          Text('1', style: TextStyle(fontSize: 11, color: kSdAccent, height: 1.2)),
+        ]),
+      );
+
+  Widget _entryIcon(SdGlyph g) => Padding(padding: const EdgeInsets.only(left: 24), child: SdIcon(g, size: 20));
+
+  Widget _section(SdPalette p, SdGlyph glyph, String label, bool open, VoidCallback toggle) {
     return InkWell(
       onTap: toggle,
+      hoverColor: Colors.transparent,
       child: SizedBox(
-        height: 44,
+        height: 40,
         child: Row(children: [
           const SizedBox(width: 18),
-          Icon(icon, size: 19, color: p.text),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: p.text))),
-          Icon(open ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 20, color: p.muted),
-          const SizedBox(width: 18),
+          SdIcon(glyph, size: 19, color: p.text),
+          const SizedBox(width: 7),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 15.5, color: p.text))),
+          Icon(open ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 18, color: p.muted),
+          const SizedBox(width: 20),
         ]),
       ),
     );
@@ -449,24 +465,26 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
       required Widget leading,
       required String label,
       required VoidCallback onTap,
+      double gap = 12,
+      Widget? trailing,
       bool dim = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Material(
         color: selected ? p.soft : Colors.transparent,
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: BorderRadius.circular(6),
         child: InkWell(
-          borderRadius: BorderRadius.circular(5),
-          hoverColor: p.soft.withOpacity(0.6),
+          borderRadius: BorderRadius.circular(6),
+          hoverColor: p.soft.withOpacity(0.55),
           onTap: onTap,
           child: SizedBox(
-            height: 38,
+            height: 36,
             child: Stack(children: [
               if (selected)
                 Positioned(
                   left: 0,
-                  top: 11,
-                  bottom: 11,
+                  top: 10,
+                  bottom: 10,
                   child: Container(
                       width: 3,
                       decoration: BoxDecoration(color: kSdAccent, borderRadius: BorderRadius.circular(2))),
@@ -474,13 +492,14 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
               Row(children: [
                 const SizedBox(width: 14),
                 leading,
-                const SizedBox(width: 12),
+                SizedBox(width: gap),
                 Expanded(
                   child: Text(label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 15, color: dim ? p.muted : p.text)),
+                      style: TextStyle(fontSize: 15.5, color: dim ? p.hint : p.text)),
                 ),
+                if (trailing != null) trailing,
                 const SizedBox(width: 8),
               ]),
             ]),
@@ -556,85 +575,94 @@ class _AssistPageState extends State<_AssistPage> {
         final showOneTime = !click && method != kUsePermanentPassword;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SizedBox(
-            height: 64,
+            height: 68,
             child: Row(children: [
-              const SizedBox(width: 20),
-              Text('本设备', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: p.text)),
+              const SizedBox(width: 16),
+              Text('本设备', style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w600, color: p.text)),
               const Spacer(),
-              Text('允许他人远程协助', style: TextStyle(fontSize: 14, color: p.text)),
-              const SizedBox(width: 6),
-              Obx(() => sdSwitch(p, !svcStopped.value, (v) => start_service(v), caption: false)),
+              Text('允许他人远程协助', style: TextStyle(fontSize: 14.5, color: p.text)),
               const SizedBox(width: 12),
+              Obx(() => SdToggle(value: !svcStopped.value, onChanged: (v) => start_service(v))),
+              const SizedBox(width: 16),
             ]),
           ),
           Divider(height: 1, color: p.divider),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+            padding: const EdgeInsets.fromLTRB(16, 22, 16, 14),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
-                flex: 5,
+                flex: 32,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('本设备ID', style: TextStyle(fontSize: 13, color: p.muted)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Text(model.serverId.text,
                       maxLines: 1,
                       style: TextStyle(
-                          fontSize: 26,
+                          fontSize: 27,
+                          height: 1.15,
                           fontWeight: FontWeight.w700,
                           color: p.text,
                           fontFeatures: const [FontFeature.tabularFigures()])),
                 ]),
               ),
               Expanded(
-                flex: 7,
+                flex: 68,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(children: [
-                    Text('验证方式：', style: TextStyle(fontSize: 13, color: p.muted)),
-                    click
-                        ? Text('需本机点击接受', style: TextStyle(fontSize: 13, color: p.muted))
-                        : _methodMenu(p, model, method),
-                  ]),
+                  SizedBox(
+                    height: 18,
+                    child: Row(children: [
+                      Text('验证方式：', style: TextStyle(fontSize: 13, color: p.muted)),
+                      click
+                          ? Text('需本机点击接受', style: TextStyle(fontSize: 13, color: p.muted))
+                          : _methodMenu(p, model, method),
+                    ]),
+                  ),
                   const SizedBox(height: 6),
-                  Wrap(crossAxisAlignment: WrapCrossAlignment.center, runSpacing: 6, children: [
-                    Obx(() => Text(
-                          click
-                              ? '对方连接时在弹窗中接受'
-                              : (showOneTime
-                                  ? (_showCode.value ? model.serverPasswd.text : '••••••••')
-                                  : '已设置固定密码'),
-                          maxLines: 1,
-                          style: TextStyle(
-                              fontSize: showOneTime ? 24 : 17,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: showOneTime ? 1.5 : 0,
-                              color: p.text),
-                        )),
-                    const SizedBox(width: 8),
-                    if (showOneTime)
-                      Obx(() => sdIconButton(
-                          p,
-                          _showCode.value ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          _showCode.value ? '隐藏验证码' : '查看验证码',
-                          () => _showCode.toggle(),
-                          color: p.text)),
-                    if (showOneTime)
-                      sdIconButton(p, Icons.refresh_rounded, '更换验证码', () => bind.mainUpdateTemporaryPassword(),
-                          color: p.text),
-                    if (!bind.isDisableSettings())
-                      sdIconButton(p, Icons.settings_outlined, '安全设置', widget.onSecurity, color: p.text),
-                    const SizedBox(width: 8),
-                    sdOutlineButton(p, '复制并分享', () {
-                      final id = trimID(model.serverId.text);
-                      sdCopy(showOneTime
-                          ? '请用 super远程桌面 远程协助我：\n设备ID：$id\n验证码：${model.serverPasswd.text}'
-                          : '请用 super远程桌面 远程协助我：\n设备ID：$id');
-                    }),
-                  ]),
-                  if (showOneTime)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text('每次远控后自动刷新', style: TextStyle(fontSize: 12, color: p.hint)),
-                    ),
+                  SizedBox(
+                    height: 36,
+                    child: Row(children: [
+                      Expanded(
+                        child: Obx(() => Text(
+                              click
+                                  ? '对方连接时在弹窗中接受'
+                                  : (showOneTime
+                                      ? (_showCode.value ? model.serverPasswd.text : '••••••••')
+                                      : '已设置固定密码'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: showOneTime ? (_showCode.value ? 26 : 22) : 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: showOneTime ? (_showCode.value ? 1.5 : 3.5) : 0,
+                                  color: p.text),
+                            )),
+                      ),
+                      if (showOneTime)
+                        Obx(() => _plainIcon(
+                            p,
+                            _showCode.value
+                                ? Icon(Icons.visibility_outlined, size: 20, color: p.text)
+                                : SdClosedEye(size: 22, color: p.text),
+                            _showCode.value ? '隐藏验证码' : '查看验证码',
+                            () => _showCode.toggle())),
+                      if (!bind.isDisableSettings())
+                        _plainIcon(p, Icon(Icons.settings_outlined, size: 20, color: p.text), '安全设置',
+                            widget.onSecurity),
+                      const SizedBox(width: 12),
+                      sdOutlineButton(p, '复制并分享', () {
+                        final id = trimID(model.serverId.text);
+                        sdCopy(showOneTime
+                            ? '请用 super远程桌面 远程协助我：\n设备ID：$id\n验证码：${model.serverPasswd.text}'
+                            : '请用 super远程桌面 远程协助我：\n设备ID：$id');
+                      }, minWidth: 124),
+                    ]),
+                  ),
+                  SizedBox(
+                    height: 18,
+                    child: showOneTime
+                        ? Text('每次远控后自动刷新', style: TextStyle(fontSize: 12, color: p.hint))
+                        : null,
+                  ),
                 ]),
               ),
             ]),
@@ -643,6 +671,15 @@ class _AssistPageState extends State<_AssistPage> {
       }),
     );
   }
+
+  Widget _plainIcon(SdPalette p, Widget icon, String tip, VoidCallback onTap) => Tooltip(
+        message: tip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(4),
+          child: SizedBox(width: 36, height: 32, child: Center(child: icon)),
+        ),
+      );
 
   Widget _methodMenu(SdPalette p, ServerModel model, String method) {
     const labels = {
@@ -653,16 +690,25 @@ class _AssistPageState extends State<_AssistPage> {
     return PopupMenuButton<String>(
       tooltip: '修改验证方式',
       initialValue: method,
-      offset: const Offset(0, 28),
+      offset: const Offset(0, 24),
       onSelected: (v) async {
+        if (v == '_refresh') {
+          bind.mainUpdateTemporaryPassword();
+          return;
+        }
         await model.setVerificationMethod(v);
         await model.updatePasswordModel();
       },
-      itemBuilder: (_) =>
-          labels.entries.map((e) => PopupMenuItem(value: e.key, height: 38, child: Text(e.value))).toList(),
+      itemBuilder: (_) => [
+        ...labels.entries.map((e) => PopupMenuItem(value: e.key, height: 36, child: Text(e.value))),
+        if (method != kUsePermanentPassword) const PopupMenuDivider(),
+        if (method != kUsePermanentPassword)
+          const PopupMenuItem(value: '_refresh', height: 36, child: Text('立即更换验证码')),
+      ],
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Text(labels[method] ?? '', style: TextStyle(fontSize: 13, color: p.muted)),
-        Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: p.muted),
+        const SizedBox(width: 2),
+        Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: p.muted),
       ]),
     );
   }
@@ -673,35 +719,32 @@ class _AssistPageState extends State<_AssistPage> {
       padding: EdgeInsets.zero,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+          padding: const EdgeInsets.fromLTRB(16, 15, 16, 14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('远控伙伴设备', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: p.text)),
-            const SizedBox(height: 6),
+            Text('远控伙伴设备', style: TextStyle(fontSize: 17.5, fontWeight: FontWeight.w600, color: p.text)),
+            const SizedBox(height: 4),
             Text('通过其他设备的【设备ID】及【设备验证码】启动远程控制', style: TextStyle(fontSize: 13, color: p.muted)),
           ]),
         ),
         Divider(height: 1, color: p.divider),
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+          padding: const EdgeInsets.fromLTRB(16, 22, 16, 26),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('伙伴的设备ID', style: TextStyle(fontSize: 13, color: p.muted)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(children: [
-              SizedBox(
-                width: 240,
-                child: TextField(
-                  controller: _idCtrl,
-                  inputFormatters: [IDTextInputFormatter()],
-                  onSubmitted: (_) => _connect(),
-                  style: TextStyle(fontSize: 15, color: p.text),
-                  decoration: sdInputDecoration(p, '请输入设备ID'),
-                ),
+              SdTextBox(
+                controller: _idCtrl,
+                hint: '请输入设备ID',
+                width: 170,
+                inputFormatters: [IDTextInputFormatter()],
+                onSubmitted: (_) => _connect(),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 13),
               ValueListenableBuilder<TextEditingValue>(
                 valueListenable: _idCtrl,
                 builder: (context, v, _) =>
-                    sdPrimaryButton(p, '连接', v.text.trim().isEmpty ? null : _connect, height: 38, minWidth: 140),
+                    sdPrimaryButton(p, '连接', v.text.trim().isEmpty ? null : _connect, height: 32, minWidth: 124),
               ),
             ]),
           ]),
@@ -716,31 +759,32 @@ class _AssistPageState extends State<_AssistPage> {
 Widget _deviceRow(SdPalette p, Peer x,
     {required bool online, bool self = false, required void Function(String id) onOpen}) {
   return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: 6),
     child: Material(
       color: p.card,
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
+        hoverColor: p.soft.withOpacity(0.35),
         onTap: self ? null : () => onOpen(x.id),
         onDoubleTap: self ? null : () => connect(Get.context!, x.id),
         child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
+          height: 54,
+          padding: const EdgeInsets.only(left: 16, right: 8),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.line)),
           child: Row(children: [
-            sdPlatformTile(x.platform, size: 34, online: self || online),
-            const SizedBox(width: 16),
+            sdPlatformTile(x.platform, size: 32, online: self || online),
+            const SizedBox(width: 13),
             Flexible(
               child: Text(sdPeerName(x),
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, color: p.text)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.5, color: p.text)),
             ),
             if (self)
               Container(
-                margin: const EdgeInsets.only(left: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(color: p.badge, borderRadius: BorderRadius.circular(3)),
-                child: const Text('本机', style: TextStyle(fontSize: 11.5, color: kSdAccent)),
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(color: p.badge, borderRadius: BorderRadius.circular(2)),
+                child: const Text('本机', style: TextStyle(fontSize: 11, color: kSdAccent, height: 1.3)),
               ),
             if (!self && online)
               Container(
@@ -749,10 +793,10 @@ Widget _deviceRow(SdPalette p, Peer x,
                   height: 6,
                   decoration: const BoxDecoration(color: kSdOnline, shape: BoxShape.circle)),
             const Spacer(),
-            sdIconButton(p, Icons.info_outline_rounded, '设备信息', () => sdPeerInfoDialog(x), color: p.text),
+            sdIconButton(p, Icons.info_outline, '设备信息', () => sdPeerInfoDialog(x), color: p.text, size: 20),
             SizedBox(
-              width: 34,
-              child: self ? null : Icon(Icons.chevron_right_rounded, color: p.text, size: 22),
+              width: 44,
+              child: self ? null : Icon(Icons.chevron_right, color: p.text, size: 20),
             ),
           ]),
         ),
@@ -878,7 +922,7 @@ class _FavPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 120),
                 child: Column(children: [
-                  Icon(Icons.inventory_2_rounded, size: 96, color: kSdAccent.withOpacity(0.32)),
+                  const SdIcon(SdGlyph.emptyBox, size: 104),
                   const SizedBox(height: 14),
                   Text('暂无收藏', style: TextStyle(fontSize: 15, color: p.text)),
                 ]),
@@ -955,7 +999,8 @@ class _DevicePageState extends State<_DevicePage> {
               _moreMenu(p, x),
             ]),
           ),
-          _preview(p, x, online),
+          if (SdSessions.peers.containsKey(x.id)) _sessionBanner(p, x),
+          _preview(p, x, online, connected: SdSessions.peers.containsKey(x.id)),
           const SizedBox(height: 22),
           Text('设备信息', style: TextStyle(fontSize: 15, color: p.text)),
           const SizedBox(height: 10),
@@ -982,7 +1027,30 @@ class _DevicePageState extends State<_DevicePage> {
         ]),
       );
 
-  Widget _preview(SdPalette p, Peer x, bool online) {
+  /// Shown while this device has an open session window (light blue bar, like the reference).
+  Widget _sessionBanner(SdPalette p, Peer x) => Container(
+        height: 46,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(left: 16, right: 8),
+        decoration: BoxDecoration(
+          color: p.dark ? const Color(0xFF1D2B45) : const Color(0xFFE6F0FF),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(children: [
+          const Icon(Icons.connected_tv_outlined, size: 20, color: kSdAccent),
+          const SizedBox(width: 8),
+          const Text('被控中', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: kSdAccent)),
+          Container(width: 1, height: 14, color: kSdAccent.withOpacity(0.35), margin: const EdgeInsets.symmetric(horizontal: 12)),
+          const Expanded(
+              child: Text('本机正在控制此电脑', style: TextStyle(fontSize: 14, color: kSdAccent))),
+          sdOutlineButton(p, '断开所有远控', () => SdSessions.close(x.id), minWidth: 0, height: 28),
+          const SizedBox(width: 6),
+          sdIconButton(p, Icons.keyboard_arrow_down, '显示远控窗口', () => SdSessions.show(x.id),
+              color: kSdAccent, size: 20),
+        ]),
+      );
+
+  Widget _preview(SdPalette p, Peer x, bool online, {bool connected = false}) {
     final colors = online
         ? const [Color(0xFF00A2FF), Color(0xFF0057D9), Color(0xFF00328A)]
         : const [Color(0xFF9AA3AE), Color(0xFF6E7781), Color(0xFF4F565E)];
@@ -1005,25 +1073,39 @@ class _DevicePageState extends State<_DevicePage> {
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: p.line)),
       child: Column(children: [
         InkWell(
-          onTap: () => sdConnectMode(context, x.id, viewOnly: false),
+          onTap: connected ? () => SdSessions.show(x.id) : () => sdConnectMode(context, x.id, viewOnly: false),
           child: Container(
-            height: 300,
+            height: 240,
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
             ),
             child: Stack(children: [
               Positioned(
-                right: 120,
-                top: 70,
-                child: sdPlatformIcon(x.platform, size: 150, color: Colors.white.withOpacity(0.28)),
+                right: 150,
+                top: 46,
+                child: sdPlatformIcon(x.platform, size: 140, color: Colors.white.withOpacity(0.3)),
               ),
-              const Center(
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text('进入桌面', style: TextStyle(fontSize: 18, color: Colors.white)),
-                  SizedBox(width: 12),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 22),
-                ]),
-              ),
+              if (!connected)
+                const Align(
+                  alignment: Alignment(0, 0.58),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('进入桌面', style: TextStyle(fontSize: 17, color: Colors.white)),
+                    SizedBox(width: 12),
+                    Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                  ]),
+                )
+              else ...[
+                Positioned.fill(child: Container(color: Colors.black.withOpacity(0.38))),
+                Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.connected_tv_outlined, size: 54, color: Colors.white),
+                    const SizedBox(height: 8),
+                    const Text('已建立远程连接', style: TextStyle(fontSize: 14.5, color: Colors.white)),
+                    const SizedBox(height: 14),
+                    sdPrimaryButton(p, '显示远控窗口', () => SdSessions.show(x.id), height: 32, minWidth: 124),
+                  ]),
+                ),
+              ],
             ]),
           ),
         ),

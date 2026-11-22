@@ -3426,16 +3426,19 @@ Widget _sdCard({required String title, required List<Widget> children, List<Widg
             color: p.card, borderRadius: BorderRadius.circular(6), border: Border.all(color: p.line)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
+            padding: const EdgeInsets.fromLTRB(20, 16, 12, 6),
             child: Row(children: [
               Expanded(
                   child: Text(translate(title),
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: p.text))),
+                      style: TextStyle(fontSize: 13.5, color: p.muted))),
               ...?titleSuffix,
             ]),
           ),
-          ...children.map((e) => Padding(padding: const EdgeInsets.fromLTRB(12, 0, 16, 0), child: e)),
-          const SizedBox(height: 10),
+          for (var i = 0; i < children.length; i++) ...[
+            if (i > 0) Divider(height: 1, indent: 20, endIndent: 16, color: p.divider),
+            Padding(padding: const EdgeInsets.fromLTRB(12, 0, 16, 0), child: children[i]),
+          ],
+          const SizedBox(height: 6),
         ]),
       ),
     );
@@ -3447,14 +3450,16 @@ Widget _sdOptionRow(BuildContext context, String label, RxBool ref, Function(boo
   final p = SdPalette(context);
   return Obx(() => InkWell(
         onTap: onChanged == null ? null : () => onChanged(!ref.value),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 0, 4),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 52),
+          padding: const EdgeInsets.fromLTRB(8, 6, 0, 6),
+          alignment: Alignment.centerLeft,
           child: Row(children: [
             Expanded(
               child: Row(children: [
                 Flexible(
                   child: Text(translate(label),
-                      style: TextStyle(fontSize: 14, color: onChanged == null ? p.hint : p.text)),
+                      style: TextStyle(fontSize: 15, color: onChanged == null ? p.hint : p.text)),
                 ),
                 if (trailing != null) trailing,
               ]),

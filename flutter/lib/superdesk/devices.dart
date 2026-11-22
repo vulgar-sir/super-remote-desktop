@@ -5,6 +5,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/formatter/id_formatter.dart';
@@ -12,6 +14,7 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:get/get.dart';
 
 /// Online state of the listed devices, refreshed while a device list is shown.
@@ -128,5 +131,48 @@ Future<void> sdApplyViewMode(FfiModel ffiModel, String peerId) async {
   if (bind.sessionGetToggleOptionSync(sessionId: sessionId, arg: kOptionToggleViewOnly) != on) {
     await bind.sessionToggleOption(sessionId: sessionId, value: kOptionToggleViewOnly);
     ffiModel.setViewOnly(peerId, on);
+  }
+}
+
+/// Asks a session window to close the tab of a peer ("断开所有远控" on the device page).
+const kSdWindowEventClosePeer = 'sd_close_peer';
+
+/// Peers that have an open remote session tab, polled from the session windows: peer id -> window.
+class SdSessions {
+  static final peers = <String, int>{}.obs;
+  static Timer? _timer;
+
+  static void start() {
+    if (!isDesktop) return;
+    _timer ??= Timer.periodic(const Duration(seconds: 2), (_) => _poll());
+    _poll();
+  }
+
+  static Future<void> _poll() async {
+    final found = <String, int>{};
+    try {
+      for (final w in await rustDeskWinManager.getAllSubWindowIds()) {
+        try {
+          final r = await DesktopMultiWindow.invokeMethod(w, kWindowEventGetRemoteList, null);
+          if (r is String) {
+            for (final id in r.split(',')) {
+              if (id.isNotEmpty) found[id] = w;
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    if (!mapEquals(found, Map<String, int>.from(peers))) peers.assignAll(found);
+  }
+
+  static Future<void> show(String id) async {
+    final w = peers[id];
+    if (w != null) await DesktopMultiWindow.invokeMethod(w, kWindowEventActiveSession, id);
+  }
+
+  static Future<void> close(String id) async {
+    final w = peers[id];
+    if (w != null) await DesktopMultiWindow.invokeMethod(w, kSdWindowEventClosePeer, id);
+    await _poll();
   }
 }

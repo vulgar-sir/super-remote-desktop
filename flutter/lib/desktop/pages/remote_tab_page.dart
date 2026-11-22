@@ -22,6 +22,7 @@ import 'package:bot_toast/bot_toast.dart';
 
 import '../../common/widgets/dialog.dart';
 import '../../models/platform_model.dart';
+import 'package:flutter_hbb/superdesk/devices.dart' show kSdWindowEventClosePeer;
 
 class _MenuTheme {
   static const Color blueColor = MyTheme.button;
@@ -491,6 +492,9 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
         windowOnTop(windowId());
       }
       return jumpOk;
+    } else if (call.method == kSdWindowEventClosePeer) {
+      tabController.closeBy(call.arguments);
+      return true;
     } else if (call.method == kWindowEventActiveDisplaySession) {
       final args = jsonDecode(call.arguments);
       final id = args['id'];
