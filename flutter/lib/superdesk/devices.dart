@@ -3,9 +3,12 @@
 // Everything goes through the existing peer models and FFI calls.
 
 import 'dart:async';
+import 'dart:convert';
+import 'dart:ffi' hide Size;
 import 'dart:io';
 
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hbb/common.dart';
@@ -174,5 +177,72 @@ class SdSessions {
     final w = peers[id];
     if (w != null) await DesktopMultiWindow.invokeMethod(w, kSdWindowEventClosePeer, id);
     await _poll();
+  }
+}
+
+/// Remote-control sessions *into* this machine ("本机被控中"). The server keeps the count; the
+/// connection manager showing them is a separate process, so its window is raised by title.
+class SdIncoming {
+  static final count = 0.obs;
+  static Timer? _timer;
+
+  static void start() {
+    if (!isDesktop || bind.isOutgoingOnly()) return;
+    _timer ??= Timer.periodic(const Duration(seconds: 2), (_) => _poll());
+    _poll();
+  }
+
+  static Future<void> _poll() async {
+    try {
+      final s = jsonDecode(await bind.mainGetConnectStatus());
+      final n = s is Map ? s['video_conn_count'] : null;
+      count.value = n is int ? n : 0;
+    } catch (_) {}
+  }
+
+  /// Brings the connection-manager window forward. It lives in its own process and retitles itself after
+  /// the selected client ("<peer> - <app>", server_page.dart), so look for a Flutter runner window of
+  /// another process titled "<app> - Connection Manager" or "<label> - <app>" (session windows of this
+  /// process are "<id> - Remote Desktop - <app>" and the like).
+  static void showWindow() {
+    if (!Platform.isWindows) return;
+    final app = bind.mainGetAppNameSync();
+    final cls = 'FLUTTER_RUNNER_WIN32_WINDOW'.toNativeUtf16();
+    final buf = malloc<Uint16>(512).cast<Utf16>();
+    final procId = malloc<Uint32>();
+    try {
+      final user32 = DynamicLibrary.open('user32.dll');
+      final findWindowEx = user32.lookupFunction<IntPtr Function(IntPtr, IntPtr, Pointer<Utf16>, Pointer<Utf16>),
+          int Function(int, int, Pointer<Utf16>, Pointer<Utf16>)>('FindWindowExW');
+      final getText = user32.lookupFunction<Int32 Function(IntPtr, Pointer<Utf16>, Int32),
+          int Function(int, Pointer<Utf16>, int)>('GetWindowTextW');
+      final getPid = user32.lookupFunction<Uint32 Function(IntPtr, Pointer<Uint32>), int Function(int, Pointer<Uint32>)>(
+          'GetWindowThreadProcessId');
+      final showWindow =
+          user32.lookupFunction<Int32 Function(IntPtr, Int32), int Function(int, int)>('ShowWindow');
+      final setForeground =
+          user32.lookupFunction<Int32 Function(IntPtr), int Function(int)>('SetForegroundWindow');
+      var hwnd = 0;
+      while ((hwnd = findWindowEx(0, hwnd, cls, nullptr)) != 0) {
+        getPid(hwnd, procId);
+        if (procId.value == pid) continue;
+        getText(hwnd, buf, 512);
+        final title = buf.toDartString();
+        final suffix = ' - $app';
+        final isCm = title == '$app - Connection Manager' ||
+            (title.endsWith(suffix) && !title.substring(0, title.length - suffix.length).contains(' - '));
+        if (isCm) {
+          showWindow(hwnd, 9); // SW_RESTORE
+          setForeground(hwnd);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('superdesk: raise cm window failed: $e');
+    } finally {
+      malloc.free(cls);
+      malloc.free(buf);
+      malloc.free(procId);
+    }
   }
 }

@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'desktop_settings.dart';
 import 'devices.dart';
 import 'superdesk.dart';
 import 'theme.dart';
@@ -258,7 +259,7 @@ void _howToAddDialog() {
 
 // ------------------------------------------------------------------------------------------ home
 
-enum _Page { assist, all, fav, device, settings }
+enum _Page { assist, all, fav, device, settings, settingsMore }
 
 class SuperdeskDesktopHome extends StatefulWidget {
   /// Install / update / system-error cards from DesktopHomePage.
@@ -282,6 +283,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
     super.initState();
     SdOnline.start();
     SdSessions.start();
+    SdIncoming.start();
     bind.mainLoadRecentPeers();
     bind.mainLoadFavPeers();
     _settingsWorker = ever<SettingsTabKey?>(sdHomeSettingsRequest, (tab) {
@@ -299,6 +301,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
   }
 
   void _go(_Page page, {String device = '', SettingsTabKey tab = SettingsTabKey.general}) {
+    if (page == _Page.settings && sdSettingsTabOf(tab) == null) page = _Page.settingsMore;
     setState(() {
       _page = page;
       _deviceId = device;
@@ -350,13 +353,30 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
       case _Page.device:
         return _DevicePage(key: ValueKey(_deviceId), id: _deviceId, onRemoved: () => _go(_Page.all));
       case _Page.settings:
-        // Built only while shown: the settings page registers global controllers.
-        return DesktopSettingPage(key: ValueKey(_settingsTab), initialTabkey: _settingsTab, sdTopTabs: true);
+        return SdSettingsPage(
+            key: ValueKey(_settingsTab),
+            initialTab: sdSettingsTabOf(_settingsTab) ?? SdSettingsTab.general,
+            onMore: (tab) => _go(_Page.settingsMore, tab: tab));
+      case _Page.settingsMore:
+        // RustDesk's full settings page. Built only while shown: it registers global controllers.
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(30, 12, 0, 0),
+            child: TextButton.icon(
+              onPressed: () => _go(_Page.settings, tab: _settingsTab),
+              icon: const Icon(Icons.chevron_left_rounded, size: 20),
+              label: const Text('返回常用设置', style: TextStyle(fontSize: 14)),
+            ),
+          ),
+          Expanded(
+              child: DesktopSettingPage(key: ValueKey(_settingsTab), initialTabkey: _settingsTab, sdTopTabs: true)),
+        ]);
     }
   }
 
   Widget _sidebar(SdPalette p) {
     return Column(children: [
+      Obx(() => SdIncoming.count.value > 0 ? _incomingCard(SdIncoming.count.value) : const SizedBox.shrink()),
       Expanded(
         child: AnimatedBuilder(animation: sdPeersListenable, builder: (context, _) {
           return Obx(() {
@@ -418,7 +438,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
         Divider(height: 1, color: p.dark ? p.line : const Color(0xFFE1E6E8)),
         const SizedBox(height: 8),
         _item(p,
-            selected: _page == _Page.settings,
+            selected: _page == _Page.settings || _page == _Page.settingsMore,
             leading: Padding(
                 padding: const EdgeInsets.only(left: 0.5),
                 child: Icon(Icons.settings_outlined, color: p.text, size: 19)),
@@ -429,6 +449,54 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
       ],
     ]);
   }
+
+  /// "本机被控中" card on top of the sidebar while another device controls this one (like the reference);
+  /// opens the connection-manager window.
+  Widget _incomingCard(int n) => Padding(
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 2),
+        child: Material(
+          color: const Color(0xFF3183FF),
+          borderRadius: BorderRadius.circular(6),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: SdIncoming.showWindow,
+            hoverColor: Colors.white.withOpacity(0.08),
+            highlightColor: Colors.white.withOpacity(0.12),
+            splashColor: Colors.white24,
+            child: SizedBox(
+              height: 96,
+              child: Stack(children: [
+                Positioned(
+                  right: 14,
+                  bottom: -12,
+                  child: Icon(Icons.connected_tv_outlined, size: 86, color: Colors.white.withOpacity(0.13)),
+                ),
+                const Positioned(
+                  right: 10,
+                  top: 10,
+                  child: Tooltip(
+                      message: '显示被控窗口', child: Icon(Icons.open_in_full_rounded, size: 16, color: Colors.white)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 12, 0),
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('本机被控中',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+                        const SizedBox(height: 6),
+                        Text('当前有 $n 台设备正在控制此电脑',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.92))),
+                      ]),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      );
 
   /// "open session" badge next to a device: screen glyph + count, like the reference.
   Widget _sessionBadge() => Container(
