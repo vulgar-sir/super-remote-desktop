@@ -6,6 +6,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/desktop/widgets/tabbar_widget.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
+import 'package:flutter_hbb/superdesk/port_forward.dart';
 import 'package:get/get.dart';
 
 const double _kColumn1Width = 30;
@@ -95,6 +96,7 @@ class _PortForwardPageState extends State<PortForwardPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (!widget.isRDP) return SdPortForwardView(id: widget.id, sessionId: _ffi.sessionId);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: FutureBuilder(future: () async {

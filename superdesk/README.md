@@ -36,6 +36,8 @@
     服务器状态、局域网发现、直接 IP 访问、代理。每页底部“更多…设置”进入 RustDesk 原有完整设置（显示、账户、打印机、关于等）。
     安装版沿用 RustDesk 的锁定：修改安全/网络项前需管理员授权或解锁 PIN；
   - **本机被控中**：有设备正在远控本机时，侧栏顶部出现蓝色卡片“本机被控中 / 当前有 N 台设备正在控制此电脑”，点击切到被控窗口。
+  - **端口映射窗口**：对齐 UU——设备名 + 状态、“映射列表”卡片 + 添加、表格（名称/本地端口/目标地址/目标端口/映射状态/操作“⋯”：复制本地地址、删除）；
+    增删仍调用 RustDesk 原有的 session 接口；RDP 映射页保持原样。
   - **消息中心**：标题栏铃铛（未读红色数字），打开后是公告列表（公告消息 + 日期 + 未读红点、一键已读），点开看正文；公告在控制台“公告”页发布。
   - **设备预览用真实壁纸**：Windows 客户端启动时把本机桌面壁纸缩成 480px 上传到控制台（壁纸变了才重传），
     登录了控制台账号的客户端在设备页用它做预览图；没有壁纸或未登录时仍是渐变底。
@@ -201,6 +203,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/hbbs_http/record_upload.rs` | 录屏上传开关可由控制台策略 `superdesk-record-upload` 打开（上游此开关无人设置） |
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
+| `flutter/lib/desktop/pages/port_forward_page.dart` | 非 RDP 的端口映射改用 `SdPortForwardView`（一行挂钩） |
 | `flutter/lib/common/widgets/login.dart` | 登录框下方挂“注册账号”入口（`sdRegisterLink`，调用控制台 `/api/superdesk/register`） |
 | `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |
 | `common.dart`（`MyTheme.accent` 改为 #3A7BFC）、`desktop/pages/server_page.dart`（被控卡片 `_sdUuCm`、断开远控按钮） | 被控窗口与全局主色 |
