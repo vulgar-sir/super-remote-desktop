@@ -455,6 +455,7 @@ class _CmHeaderState extends State<_CmHeader>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (_sdUuCm) return _sdUuHeader(context);
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10.0),
@@ -1037,7 +1038,14 @@ class _CmControlPanel extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: buildButton(context,
+              child: _sdUuCm
+                  ? buildButton(context,
+                      color: Colors.white,
+                      border: Border.all(color: const Color(0xFFDADDE2)),
+                      onClick: handleDisconnect,
+                      text: '断开远控',
+                      textColor: const Color(0xFF191919))
+                  : buildButton(context,
                   color: Colors.redAccent,
                   onClick: handleDisconnect,
                   text: 'Disconnect',
@@ -1461,6 +1469,84 @@ class __FileTransferLogPageState extends State<_FileTransferLogPage> {
                   : statusListView(jobTable);
             },
           )),
+    );
+  }
+}
+
+// super远程桌面: incoming-session card in the UU-remote style ("本机被控中" + timer, who is
+// connected and how). Same state, timer and chat button as the stock header above.
+const bool _sdUuCm = true;
+
+extension _SdUuCmHeader on _CmHeaderState {
+  Widget _sdUuHeader(BuildContext context) {
+    final type = client.type_();
+    final what = type == ClientType.file
+        ? '传输文件'
+        : type == ClientType.terminal
+            ? '使用终端'
+            : type == ClientType.camera
+                ? '查看摄像头'
+                : type == ClientType.portForward
+                    ? '端口映射'
+                    : '远程控制';
+    final title = !client.authorized ? '请求远程控制本机' : (client.disconnected ? '远控已结束' : '本机被控中');
+    const white = TextStyle(color: Colors.white);
+    final showChat = client.authorized &&
+        (type == ClientType.remote || type == ClientType.file || type == ClientType.camera);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 10.0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 4, 14),
+      decoration: BoxDecoration(color: const Color(0xFF3183FF), borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(children: [
+                Text(title, style: white.copyWith(fontSize: 20, fontWeight: FontWeight.bold)),
+                if (client.authorized && !client.disconnected) ...[
+                  const SizedBox(width: 12),
+                  Obx(() => Text(formatDurationToTime(Duration(seconds: _time.value)),
+                      style: white.copyWith(fontSize: 20, fontWeight: FontWeight.bold))),
+                ],
+              ]),
+            ),
+          ),
+          if (showChat)
+            IconButton(
+              onPressed: () => checkClickTime(client.id, () {
+                if (type == ClientType.file) {
+                  gFFI.chatModel.toggleCMFilePage();
+                } else {
+                  gFFI.chatModel.toggleCMChatPage(MessageKey(client.peerId, client.id));
+                }
+              }),
+              icon: SvgPicture.asset(type == ClientType.file ? 'assets/file_transfer.svg' : 'assets/chat2.svg'),
+              splashRadius: kDesktopIconButtonSplashRadius,
+            ),
+        ]),
+        const SizedBox(height: 6),
+        Text('${client.name}（${client.peerId}）',
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: white.copyWith(fontSize: 13)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+                border: Border.all(color: Colors.white70), borderRadius: BorderRadius.circular(3)),
+            child: Text(what, style: white.copyWith(fontSize: 12)),
+          ),
+          const SizedBox(width: 8),
+          Text(client.authorized ? (client.disconnected ? '连接已断开' : '连接时长') : '等待你同意…',
+              style: white.copyWith(fontSize: 12, color: Colors.white70)),
+        ]),
+        if (client.portForward.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text('端口映射：${client.portForward}', style: white.copyWith(fontSize: 12, color: Colors.white70)),
+          ),
+      ]),
     );
   }
 }

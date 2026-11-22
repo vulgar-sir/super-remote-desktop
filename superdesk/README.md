@@ -34,6 +34,7 @@
   - **设置**：标题 + 横向标签（常规 / 安全 / 网络 / 显示 / 账户 / 打印机 / 关于），白色卡片 + “开/关”开关。
   主窗口最小 940×660。登录为 **账号密码**（控制台账号），不做短信/微信登录。
 - **Windows 员工助手**：紧凑窗口——本设备ID + 验证码卡片、醒目的“请求 IT 协助”按钮、录屏提示、状态。
+- **被控时（连接管理窗口）**：对齐 UU 的“本机被控中”——蓝色卡片显示计时、对方名称和 ID、远程控制/传输文件等类型、连接时长，底部“断开远控”；全局主色统一为 #3A7BFC（会话工具栏、文件传输、对话框等 RustDesk 原有页面也随之统一）。
 - **Android**：底部 远程协助 / 设备 / 设置，页面大标题；“远控伙伴设备”卡片 →“输入设备验证码”弹窗 → 开始远控；
   “本设备”卡片（允许他人远程协助开关、设备ID、验证码、复制并分享）+ 原有连接管理与权限卡片；
   设备页（预览卡 + 文件传输 / 远程摄像头 / 终端 / 更多）。
@@ -190,6 +191,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
 | `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |
+| `common.dart`（`MyTheme.accent` 改为 #3A7BFC）、`desktop/pages/server_page.dart`（被控卡片 `_sdUuCm`、断开远控按钮） | 被控窗口与全局主色 |
 | `desktop_tab_page.dart` + `tabbar_widget.dart`（`sdBarHeight`/`sdLeading`）、`desktop_setting_page.dart`（`sdTopTabs`、卡片/开关样式）、`main.dart`（窗口最小尺寸）、`mobile/pages/home_page.dart`（手机三标签）、`server_page.dart`（聊天按钮改为打开聊天页） | 新界面挂接 |
 | `desktop_home_page.dart`（build / buildInstallCard / buildLeftPane 挂接）、`mobile/pages/connection_page.dart`、`server_page.dart`、`home_page.dart` | 新界面挂接：只替换外观，原有逻辑不变 |
 | `flutter/windows/runner/Runner.rc`、`libs/portable/Cargo.toml` | 程序名称/描述（构建时按版本替换） |
