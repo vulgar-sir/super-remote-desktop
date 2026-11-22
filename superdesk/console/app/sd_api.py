@@ -1,9 +1,11 @@
 """super远程桌面 extensions used by our own client / scripts (no login: called from employee PCs)."""
+import os
 import re
 import time
 from collections import defaultdict, deque
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import db, notify, security
@@ -150,3 +152,54 @@ def register(b: RegisterReq, req: Request):
            (name, clip(b.display_name, 64), "", "客户端注册", security.hash_password(b.password), 0, 1, db.now()))
     db.event("user", f"{name} 在客户端注册了账号（{client_ip(req)}）")
     return {"ok": True}
+
+
+DEVICE_ID_RE = re.compile(r"[0-9A-Za-z_-]{1,32}")
+
+
+@router.get("/notices")
+def notices(req: Request, id: str = ""):
+    """Announcements for the client's 消息中心 (bell). Only devices the console has seen get them."""
+    rate_limit(req, "notices", 30)
+    if not DEVICE_ID_RE.fullmatch(id) or not db.one("SELECT 1 FROM devices WHERE id=?", (id,)):
+        raise HTTPException(status_code=403, detail="设备未登记")
+    return db.all_("SELECT id, title, content, created_at FROM notices ORDER BY id DESC LIMIT 50")
+
+
+WALL_DIR = os.path.join(db.DATA_DIR, "wallpapers")
+MAX_WALLPAPER = 1 << 20
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+JPEG_MAGIC = b"\xff\xd8\xff"
+
+
+@router.post("/wallpaper")
+async def wallpaper_upload(req: Request, id: str = "", uuid: str = ""):
+    """A device's desktop wallpaper thumbnail (PNG/JPEG), shown as its preview on other clients' device page.
+    The uploader must be the device itself: id + uuid must match what its sysinfo reported."""
+    rate_limit(req, "wallpaper", 6)
+    dev = db.one("SELECT uuid FROM devices WHERE id=?", (id,)) if DEVICE_ID_RE.fullmatch(id) else None
+    if not dev or not dev["uuid"] or dev["uuid"] != uuid:
+        raise HTTPException(status_code=403, detail="设备未登记")
+    data = await req.body()
+    if not data or len(data) > MAX_WALLPAPER or not (data[:8] == PNG_MAGIC or data[:3] == JPEG_MAGIC):
+        raise HTTPException(status_code=400, detail="图片无效")
+    os.makedirs(WALL_DIR, exist_ok=True)
+    path = os.path.join(WALL_DIR, id)
+    with open(path + ".tmp", "wb") as f:
+        f.write(data)
+    os.replace(path + ".tmp", path)
+    return {"ok": True}
+
+
+@router.get("/wallpaper/{device_id}")
+def wallpaper_get(device_id: str, authorization: str | None = Header(default=None)):
+    """Wallpaper thumbnail of a device, for clients logged in to a console account."""
+    if not security.user_from_token(security.bearer(authorization)):
+        raise HTTPException(status_code=401, detail="请先登录")
+    path = os.path.join(WALL_DIR, device_id)
+    if not DEVICE_ID_RE.fullmatch(device_id) or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="没有壁纸")
+    with open(path, "rb") as f:
+        png = f.read(8) == PNG_MAGIC
+    return FileResponse(path, media_type="image/png" if png else "image/jpeg",
+                        headers={"Cache-Control": "private, max-age=600"})

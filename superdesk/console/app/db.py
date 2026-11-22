@@ -174,6 +174,13 @@ CREATE TABLE IF NOT EXISTS events (              -- admin-visible operation log
     text TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS notices (             -- announcements shown in the client's 消息中心
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+);
 """
 
 

@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import db, notify, policy, security
-from .sd_api import client_ip, rate_limit
+from .sd_api import WALL_DIR, client_ip, rate_limit
 
 router = APIRouter(prefix="/api/admin")
 admin = Depends(security.require_admin)
@@ -129,6 +129,11 @@ def device_update(dev_id: str, body: DeviceUpd, u=admin):
 @router.delete("/devices/{dev_id}")
 def device_delete(dev_id: str, u=admin):
     db.run("DELETE FROM devices WHERE id=?", (dev_id,))
+    if re.fullmatch(r"[0-9A-Za-z_-]{1,32}", dev_id):
+        try:
+            os.remove(os.path.join(WALL_DIR, dev_id))
+        except OSError:
+            pass
     db.event("device", f"{u['name']} 删除设备记录 {dev_id}")
     return {"ok": True}
 
@@ -512,3 +517,32 @@ def start_cleanup_thread():
             time.sleep(6 * 3600)
 
     threading.Thread(target=loop, daemon=True).start()
+
+
+# ---------------------------------------------------------------- notices (client 消息中心)
+class NoticeReq(BaseModel):
+    title: str
+    content: str = ""
+
+
+@router.get("/notices")
+def notices_list(u=admin):
+    return db.all_("SELECT * FROM notices ORDER BY id DESC LIMIT 200")
+
+
+@router.post("/notices")
+def notice_create(b: NoticeReq, u=admin):
+    title = b.title.strip()[:100]
+    if not title:
+        raise HTTPException(status_code=400, detail="请填写标题")
+    nid = db.run("INSERT INTO notices(title, content, created_by, created_at) VALUES(?,?,?,?)",
+                 (title, b.content.strip()[:5000], u["name"], db.now()))
+    db.event("notice", f"{u['name']} 发布了公告：{title}")
+    return {"ok": True, "id": nid}
+
+
+@router.delete("/notices/{nid}")
+def notice_delete(nid: int, u=admin):
+    db.run("DELETE FROM notices WHERE id=?", (nid,))
+    db.event("notice", f"{u['name']} 删除了公告 #{nid}")
+    return {"ok": True}

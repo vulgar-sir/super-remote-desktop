@@ -20,8 +20,10 @@ import 'package:window_manager/window_manager.dart';
 
 import 'desktop_settings.dart';
 import 'devices.dart';
+import 'notices.dart';
 import 'superdesk.dart';
 import 'theme.dart';
+import 'wallpaper.dart';
 
 export 'theme.dart';
 
@@ -174,6 +176,7 @@ Widget? sdTitleBarTail(BuildContext context) {
   if (bind.isIncomingOnly()) return null;
   final p = SdPalette(context);
   return Row(mainAxisSize: MainAxisSize.min, children: [
+    sdNoticeBell(p),
     if (!bind.isDisableAccount()) _accountButton(p),
     _menuButton(context, p),
     Container(width: 1, height: 18, color: p.divider, margin: const EdgeInsets.symmetric(horizontal: 6)),
@@ -284,6 +287,7 @@ class _SuperdeskDesktopHomeState extends State<SuperdeskDesktopHome> {
     SdOnline.start();
     SdSessions.start();
     SdIncoming.start();
+    SdNotices.start();
     bind.mainLoadRecentPeers();
     bind.mainLoadFavPeers();
     _settingsWorker = ever<SettingsTabKey?>(sdHomeSettingsRequest, (tab) {
@@ -1156,6 +1160,7 @@ class _DevicePageState extends State<_DevicePage> {
                 top: 46,
                 child: sdPlatformIcon(x.platform, size: 140, color: Colors.white.withOpacity(0.3)),
               ),
+              Positioned.fill(child: SdWallpaper(id: x.id, online: online)),
               if (!connected)
                 const Align(
                   alignment: Alignment(0, 0.58),

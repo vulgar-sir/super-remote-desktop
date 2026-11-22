@@ -296,13 +296,23 @@ const PAGES = {
     });
   } },
 
+  notices: { title: '公告', actions: [['发布公告', 'primary', () => editNotice()]], async render() {
+    const rows = await api('GET', '/notices');
+    $('#page').innerHTML = `<div class="panel muted">公告会出现在客户端右上角的铃铛（消息中心）里，未读时显示红点。所有已登记的设备都能看到，请不要写密码等敏感信息。</div>` +
+      table([
+        ['时间', (n) => fmt(n.created_at)], ['标题', (n) => `<b>${esc(n.title)}</b>`], ['内容', (n) => esc(n.content), 'wrap'],
+        ['发布人', (n) => esc(n.created_by)],
+        ['', (n) => `<div class="acts"><button class="small danger" onclick="deleteNotice(${n.id})">删除</button></div>`],
+      ], rows, '还没有公告');
+  } },
+
   events: { title: '操作日志', async render() {
     pagedPage({ path: '/events', search: '（全部记录）', cols: [['时间', (r) => fmt(r.created_at)], ['类别', (r) => `<span class="tag">${esc(r.kind)}</span>`], ['内容', (r) => esc(r.text), 'wrap']] });
   } },
 };
 
 const NAV = [['overview'], ['devices'], ['help'], ['-', '审计'], ['conns'], ['files'], ['alarms'], ['recordings'], ['-', '管理'],
-  ['groups'], ['users'], ['abs'], ['deploy'], ['settings'], ['events']];
+  ['groups'], ['users'], ['abs'], ['notices'], ['deploy'], ['settings'], ['events']];
 
 // ------------------------------------------------------------------ actions
 function readHooks() {
@@ -412,6 +422,11 @@ window.editAb = (guid) => guard(async () => {
     toast('已保存'); route();
   }]]);
 });
+window.editNotice = () => modal('发布公告', `
+    <label>标题<input name="title" maxlength="100" placeholder="例如：今晚 22:00 系统维护"></label>
+    <label>内容<textarea name="content" rows="6" maxlength="5000" placeholder="公告正文（可选）"></textarea></label>`,
+  [cancel, ['发布', 'primary', async () => { await api('POST', '/notices', { title: val('title'), content: val('content') }); toast('已发布'); route(); }]]);
+window.deleteNotice = (id) => guard(async () => { if (!confirm('删除这条公告？')) return; await api('DELETE', `/notices/${id}`); route(); });
 window.deleteAb = (guid) => guard(async () => { if (!confirm('删除这个共享通讯录？')) return; await api('DELETE', `/address-books/${guid}`); route(); });
 window.abPeers = (guid) => guard(async () => {
   const peers = await api('GET', `/address-books/${guid}/peers`);

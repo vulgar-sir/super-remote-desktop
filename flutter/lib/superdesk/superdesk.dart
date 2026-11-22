@@ -12,6 +12,8 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'wallpaper.dart';
+
 class SuperdeskUpdate {
   final String version;
   final String build;
@@ -53,6 +55,7 @@ Future<void> _hello(String api) async {
   try {
     final id = await bind.mainGetMyId();
     if (id.isEmpty) return;
+    sdUploadWallpaper(api);
     await http
         .post(Uri.parse('$api/api/superdesk/hello'),
             headers: {'Content-Type': 'application/json'},
