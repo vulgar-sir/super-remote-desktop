@@ -149,6 +149,10 @@ pub fn core_main() -> Option<CoreMainAction> {
         args.retain(|arg| arg != "--install");
         flutter_args.retain(|arg| arg != "--install");
     }
+    #[cfg(windows)]
+    if args.is_empty() && crate::superdesk::upgrade::upgrade_older_installation() {
+        return None;
+    }
     if args.len() > 0 {
         if args[0] == "--version" {
             println!("{}", crate::VERSION);

@@ -9,6 +9,8 @@ use std::collections::HashMap;
 
 pub mod privacy;
 pub mod quick_apps;
+#[cfg(windows)]
+pub mod upgrade;
 pub mod same_account;
 
 /// Upload incoming-session recordings to our console (`/api/record`). Switched on per device

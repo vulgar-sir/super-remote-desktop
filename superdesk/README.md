@@ -174,6 +174,9 @@ python superdesk\scripts\publish.py --notes "本次更新说明"   # 上传到�
 ```
 
 - 同一批构建共用一个构建号（时间戳），客户端靠它判断是否有新版本。
+- 安装包里带 `superdesk-build.txt`（构建号），安装/升级时一起复制到安装目录。电脑上已安装旧版时，双击新下载的安装包会弹出管理员确认，
+  然后自动覆盖升级（停服务、复制文件、重启服务和托盘，`src/superdesk/upgrade.rs`）；没有这个文件的旧安装一律视为更旧。
+  上游 RustDesk 在这种情况下只会把已安装的旧版窗口调到前台，所以以前“下载新版后仍是旧版”。
 - Windows 主程序按应用名命名（`SuperDesk.exe` / `SuperDeskHelper.exe`）：RustDesk 安装程序创建服务、快捷方式时
   使用“应用名.exe”，若仍叫 rustdesk.exe 会安装失败（服务建不起来）。
 - Android 首次构建会生成签名密钥到 `secrets/android/`，**务必备份**。
@@ -261,6 +264,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/server/connection.rs`（`toggle_privacy_mode` 入口、会话结束撤防窥前锁屏、PeerInfo 报告）、`src/client/io_loop.rs`（自动开启、解析 `sd_privacy_cover`）、`src/ui_session_interface.rs`（开启请求附带设置）、`src/privacy_mode/win_topmost_window.rs`（显示前下发文字）、`src/privacy_mode/win_input.rs`（防窥下屏蔽 Ctrl+P 退出）、`src/server.rs`（启动时清理残留黑屏）、`flutter/lib/models/model.dart`（提示改 toast）、`remote_toolbar.dart`（防窥按钮） | 防窥的挂钩（逻辑在 `src/superdesk/privacy.rs`、`flutter/lib/superdesk/privacy.dart`） |
 | `src/server/connection.rs`、`src/client/io_loop.rs`、`src/ui_session_interface.rs` | 快速启动的三处挂钩：被控端应答、主控端转发给界面、`toggle_option` 发送命令（逻辑在 `src/superdesk/quick_apps.rs`） |
 | `Cargo.toml` | winapi 加 `wingdi` 特性（读取快捷方式图标） |
+| `src/core_main.rs` | 无参数启动时先检查是否需要覆盖升级已安装的旧版（逻辑在 `src/superdesk/upgrade.rs`） |
 | `flutter/lib/desktop/widgets/remote_toolbar.dart` | 工具栏 UU 风格（`_sdUuToolbar`）+ 快速启动按钮 |
 | `flutter/lib/models/model.dart`、`flutter/lib/desktop/pages/remote_tab_page.dart` | 快速启动事件、连上后执行设备页的待办、接收主窗口的打开请求 |
 | `flutter/lib/desktop/pages/port_forward_page.dart` | 非 RDP 的端口映射改用 `SdPortForwardView`（一行挂钩） |

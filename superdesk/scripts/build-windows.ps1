@@ -58,6 +58,8 @@ foreach ($fl in $Flavor) {
     $appExe = "$($buildEnv.SUPERDESK_APP_NAME).exe"
     Get-ChildItem $Release -Filter 'SuperDesk*.exe' | Remove-Item -Force
     Move-Item (Join-Path $Release 'rustdesk.exe') (Join-Path $Release $appExe) -Force
+    # Lets a newer package recognise an older installation and upgrade it (src/superdesk/upgrade.rs).
+    [IO.File]::WriteAllText((Join-Path $Release 'superdesk-build.txt'), $env:SUPERDESK_BUILD)
 
     Step 'Extras: virtual display driver (same as official package)'
     if (-not (Test-Path "$Release\usbmmidd_v2")) {
