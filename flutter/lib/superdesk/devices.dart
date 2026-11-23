@@ -24,6 +24,7 @@ import 'package:get/get.dart';
 class SdOnline {
   static final ids = <String>{}.obs;
   static Timer? _timer;
+  static Timer? _accountTimer;
   static List<String> _want = const [];
 
   static void start() {
@@ -34,6 +35,8 @@ class SdOnline {
       ids.removeAll(off);
     });
     _timer ??= Timer.periodic(const Duration(seconds: 15), (_) => _query());
+    // Devices that sign in to the same account elsewhere show up without a restart.
+    _accountTimer ??= Timer.periodic(const Duration(seconds: 60), (_) => gFFI.groupModel.pull(quiet: true));
   }
 
   static void want(List<String> list) {
@@ -50,7 +53,8 @@ class SdOnline {
 /// Fires when the recent or favourite device lists change.
 Listenable get sdPeersListenable => Listenable.merge([gFFI.recentPeersModel, gFFI.favoritePeersModel]);
 
-/// Favourites first, then address book, then recent sessions (deduplicated).
+/// Favourites first, then devices signed in to the same account, then address book, then recent
+/// sessions (deduplicated).
 List<Peer> sdAllPeers() {
   final seen = <String>{};
   final out = <Peer>[];
@@ -61,7 +65,12 @@ List<Peer> sdAllPeers() {
   }
 
   add(gFFI.favoritePeersModel.peers);
-  if (gFFI.userModel.userName.value.isNotEmpty) add(gFFI.abModel.currentAbPeers);
+  final me = gFFI.userModel.userName.value;
+  if (me.isNotEmpty) {
+    final self = trimID(gFFI.serverModel.serverId.text);
+    add(gFFI.groupModel.peers.where((x) => x.loginName == me && x.id != self));
+    add(gFFI.abModel.currentAbPeers);
+  }
   add(gFFI.recentPeersModel.peers);
   return out;
 }

@@ -408,6 +408,7 @@ class _SdMobileDevicesTabState extends State<SdMobileDevicesTab> {
               onRefresh: () async {
                 bind.mainLoadRecentPeers();
                 bind.mainLoadFavPeers();
+                await gFFI.groupModel.pull(quiet: true);
               },
               child: ListView(padding: _kMobilePad, children: [
                 _mobileTitle(p, '全部设备'),
@@ -419,7 +420,7 @@ class _SdMobileDevicesTabState extends State<SdMobileDevicesTab> {
                       const SizedBox(height: 12),
                       Text('暂无设备', style: TextStyle(fontSize: 16, color: p.text)),
                       const SizedBox(height: 6),
-                      Text('在“远程协助”输入伙伴的设备ID，连接过的设备会显示在这里',
+                      Text('登录同一账号的设备会自动显示在这里；在“远程协助”输入伙伴的设备ID，连接过的设备也会显示',
                           textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: p.muted)),
                     ]),
                   ),

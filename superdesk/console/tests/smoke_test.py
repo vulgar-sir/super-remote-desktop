@@ -100,6 +100,8 @@ check("users list", any(u["name"] == "smokeuser" for u in J(b)["data"]), b)
 s, b = call("GET", "/api/peers?current=1&pageSize=100&accessible=&status=1", token=CT)
 p = [x for x in J(b)["data"] if x["id"] == DEV]
 check("peers list has device info", p and p[0]["info"]["device_name"] == "SMOKE-PC", b[:300])
+p2 = [x for x in J(b)["data"] if x["id"] == DEV2]
+check("peers list: logged-in device carries the account name", p2 and p2[0]["user_name"] == "smokeuser", b[:300])
 s, b = call("GET", "/api/device-group/accessible?current=1&pageSize=100", token=CT)
 check("device groups", s == 200 and "data" in J(b), b)
 

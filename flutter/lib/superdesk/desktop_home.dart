@@ -270,7 +270,7 @@ void _howToAddDialog() {
         content: const Text('1. 在要远程的电脑或手机上安装 super远程桌面（菜单 → 下载中心）。\n'
             '2. 在对方设备上查看“本设备ID”和验证码，在“远程协助”页输入后点击连接。\n'
             '3. 连接过的设备会出现在“全部设备”；点设备右侧的 › 可收藏或设置备注名。\n'
-            '4. 登录账号后，通讯录中的设备也会出现在这里。'),
+            '4. 在各台设备上登录同一账号，它们会自动出现在“我的设备”；通讯录中的设备也会出现在这里。'),
         actions: [dialogButton('OK', onPressed: close)],
         onCancel: close,
         onSubmit: close,
@@ -928,7 +928,7 @@ class _AllDevicesPageState extends State<_AllDevicesPage> {
           if (_tip)
             sdBanner(context,
                 title: '添加你的其他设备',
-                content: '在其他电脑或手机上安装 super远程桌面，连接过、收藏或加入通讯录的设备会显示在这里。',
+                content: '在其他电脑或手机上安装 super远程桌面并登录同一账号，设备会自动显示在这里；连接过、收藏或加入通讯录的设备也会显示。',
                 button: '如何添加设备',
                 onPressed: _howToAddDialog, onClose: () {
               bind.mainSetLocalOption(key: 'sd-hide-add-device-tip', value: 'Y');

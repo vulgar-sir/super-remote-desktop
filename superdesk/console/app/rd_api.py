@@ -325,7 +325,7 @@ def peers(req: Request, u=Depends(security.require_user)):
     rows = db.all_("SELECT d.*, u.name AS user_name, u.display_name AS user_display FROM devices d"
                    " LEFT JOIN users u ON u.id=d.user_id ORDER BY d.group_name, d.hostname")
     out = [{"id": d["id"], "info": {"username": d["username"], "os": d["os"], "device_name": d["alias"] or d["hostname"]},
-            "status": 1, "user": d["user_name"] or "", "user_name": d["user_display"] or d["user_name"] or "",
+            "status": 1, "user": d["user_name"] or "", "user_name": d["user_name"] or "",
             "device_group_name": d["group_name"], "note": d["note"]} for d in rows]
     return paged(req, out)
 
