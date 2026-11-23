@@ -1,0 +1,2 @@
+# The patched sources use CRLF; keep the patch byte-for-byte so `git apply` matches them.
+topmost-window.patch -text

@@ -113,6 +113,7 @@ struct ParsedPeerInfo {
     idd_impl: String,
     support_view_camera: bool,
     support_terminal: bool,
+    sd_privacy_cover: bool,
 }
 
 impl ParsedPeerInfo {
@@ -1505,21 +1506,27 @@ impl<T: InvokeUiSession> Remote<T> {
             return;
         }
         let lc = self.handler.lc.read().unwrap();
-        if lc.version >= hbb_common::get_version_number("1.2.4")
-            && lc.get_toggle_option("privacy-mode")
-        {
-            let impl_key = lc.get_option("privacy-mode-impl-key");
+        let remembered = lc.get_toggle_option("privacy-mode");
+        let auto = !remembered && crate::superdesk::privacy::auto_on() && self.peer_info.sd_privacy_cover;
+        if lc.version >= hbb_common::get_version_number("1.2.4") && (remembered || auto) {
+            let impl_key = if auto {
+                crate::superdesk::privacy::auto_impl_key(self.peer_info.is_support_virtual_display())
+            } else {
+                lc.get_option("privacy-mode-impl-key")
+            };
             if impl_key == crate::privacy_mode::PRIVACY_MODE_IMPL_WIN_VIRTUAL_DISPLAY
                 && !self.peer_info.is_support_virtual_display()
             {
                 return;
             }
             let mut misc = Misc::new();
-            misc.set_toggle_privacy_mode(TogglePrivacyMode {
+            let mut t = TogglePrivacyMode {
                 impl_key,
                 on: true,
                 ..Default::default()
-            });
+            };
+            crate::superdesk::privacy::fill_request(&mut t, auto);
+            misc.set_toggle_privacy_mode(t);
             let mut msg_out = Message::new();
             msg_out.set_misc(misc);
             allow_err!(peer.send(&msg_out).await);
@@ -2623,6 +2630,10 @@ impl<T: InvokeUiSession> Remote<T> {
                 .get("support_view_camera")
                 .map(|v| v.as_bool())
                 .flatten()
+                .unwrap_or(false);
+            self.peer_info.sd_privacy_cover = platform_additions
+                .get(crate::superdesk::privacy::PLATFORM_ADDITION)
+                .and_then(|v| v.as_bool())
                 .unwrap_or(false);
         }
     }

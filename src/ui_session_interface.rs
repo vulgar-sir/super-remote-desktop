@@ -407,11 +407,13 @@ impl<T: InvokeUiSession> Session<T> {
 
     pub fn toggle_privacy_mode(&self, impl_key: String, on: bool) {
         let mut misc = Misc::new();
-        misc.set_toggle_privacy_mode(TogglePrivacyMode {
+        let mut t = TogglePrivacyMode {
             impl_key,
             on,
             ..Default::default()
-        });
+        };
+        crate::superdesk::privacy::fill_request(&mut t, false);
+        misc.set_toggle_privacy_mode(t);
         let mut msg_out = Message::new();
         msg_out.set_misc(misc);
         self.send(Data::Message(msg_out));

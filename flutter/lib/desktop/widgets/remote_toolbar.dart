@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hbb/superdesk/privacy.dart' show SdPrivacyToolbarButton;
 import 'package:flutter_hbb/superdesk/quick_apps.dart' show SdQuickAppsToolbarButton, kSdToolbarIcon, kSdToolbarHover;
 import 'package:flutter_hbb/superdesk/theme.dart' show kSdAccent, SdPalette;
 import 'package:flutter_hbb/common/widgets/audio_input.dart';
@@ -840,6 +841,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         .add(_ControlMenu(id: widget.id, ffi: widget.ffi, state: widget.state));
     if (widget.ffi.connType == ConnType.defaultConn) {
       toolbarItems.add(SdQuickAppsToolbarButton(id: widget.id, ffi: widget.ffi));
+      toolbarItems.add(SdPrivacyToolbarButton(id: widget.id, ffi: widget.ffi));
     }
     toolbarItems.add(_DisplayMenu(
       id: widget.id,

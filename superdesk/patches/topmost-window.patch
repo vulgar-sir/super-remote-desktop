@@ -1,0 +1,159 @@
+diff --git a/WindowInjection/dllmain.cpp b/WindowInjection/dllmain.cpp
+index 0f07aab..9eadcdc 100644
+--- a/WindowInjection/dllmain.cpp
++++ b/WindowInjection/dllmain.cpp
+@@ -5,6 +5,7 @@
+ #include <algorithm>
+ #include <tchar.h>
+ #include <memory>
++#include <string>
+ #include <type_traits>
+ #include <vector>
+ 
+@@ -99,6 +100,12 @@ bool g_shutting_down_windows = false;
+ bool g_show_windows_after_refresh = false;
+ bool g_privacy_windows_visible = false;
+ 
++// super远程桌面: the cover shows a black screen with this text (empty: black only). The text is
++// sent by the server with WM_COPYDATA before it shows the windows.
++constexpr ULONG_PTR SD_COPYDATA_COVER_TEXT = 0x53445043;
++std::wstring g_cover_text;
++VOID OnPaintCover(HWND hwnd, HDC hdc);
++
+ // TODO: Read the register table to get the path.
+ // Or use hard code bitmap data.
+ TCHAR g_bmpPath[256] = { 0, };
+@@ -169,6 +176,22 @@ LRESULT CALLBACK TrashParentWndProc(HWND hwnd, UINT message, WPARAM wParam, LPAR
+ 		(void)HandlePrivacyThreadMessage(message);
+ 		break;
+ 
++	case WM_COPYDATA:
++		{
++			const auto cds = reinterpret_cast<const COPYDATASTRUCT*>(lParam);
++			if (cds && cds->dwData == SD_COPYDATA_COVER_TEXT)
++			{
++				const auto chars = cds->cbData / sizeof(wchar_t);
++				g_cover_text.assign(chars > 0 ? static_cast<const wchar_t*>(cds->lpData) : L"", chars);
++				for (auto w : g_hwnds)
++				{
++					InvalidateRect(w, nullptr, TRUE);
++				}
++				return TRUE;
++			}
++		}
++		break;
++
+ 	case WM_WINDOWPOSCHANGING:
+ 		return 0;
+ 	case WM_CLOSE:
+@@ -184,8 +207,7 @@ LRESULT CALLBACK TrashParentWndProc(HWND hwnd, UINT message, WPARAM wParam, LPAR
+ 			HDC hdc = BeginPaint(hwnd, &ps);
+ 			if (hdc)
+ 			{
+-				// OnPaintGdi(hwnd, hdc);
+-				OnPaintGdiPlus(hwnd, hdc);
++				OnPaintCover(hwnd, hdc);
+ 				EndPaint(hwnd, &ps);
+ 			}
+ 		}
+@@ -358,10 +380,12 @@ HWND CreateWin(HMODULE hModule, UINT zbid, const TCHAR* title, const TCHAR* clas
+ 		return FailCreatedWindow(hwnd, _T("SetDwmBoolWindowAttribute DWMWA_EXCLUDED_FROM_PEEK"));
+ 	}
+ 
++#ifndef SD_CAPTURABLE_COVER // only for checking the cover's look in a screenshot
+ 	if (IsWindowsVersionOrGreater(10, 0, 19041, 0, 0) == TRUE)
+ 	{
+ 		(void)SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+ 	}
++#endif
+ 
+ 	if (FALSE == UpdateWindow(hwnd))
+ 	{
+@@ -679,35 +703,7 @@ DWORD WINAPI UwU(LPVOID lpParam)
+ 	PeekMessage(&msg, nullptr, WM_USER, WM_USER, PM_NOREMOVE);
+ 	InterlockedExchange(&g_window_thread_id, GetCurrentThreadId());
+ 
+-#ifdef WINDOWINJECTION_EXPORTS
+-	auto initRes = g_bitmapLoader.Initialize(true);
+-#else
+-	auto initRes = g_bitmapLoader.Initialize(true);
+-#endif
+-	if (EBitmapLoader::kOk != initRes)
+-	{
+-		ShowBitmapLoaderErrorMsg(_T("Initialize"), initRes, g_bitmapLoader.GetLastErrMsg());
+-		return FinishPrivacyThread(0);
+-	}
+-
+-	long rect[4] = { 0, 0, PRIVACY_BITMAP_WIDTH, PRIVACY_BITMAP_HEIGHT };
+-	auto DIBres = EBitmapLoader::kErrUnknown;
+-	if (g_loadFromMemory)
+-	{
+-		DIBres = g_bitmapLoader.CreateDIBFromMemory(
+-			(char*)(g_img),
+-			static_cast<unsigned int>(g_imgLen),
+-			rect);
+-	}
+-	else
+-	{
+-		DIBres = g_bitmapLoader.CreateDIBFromFile(DefaultBmpPath, rect);
+-	}
+-	if (EBitmapLoader::kOk != DIBres)
+-	{
+-		ShowBitmapLoaderErrorMsg(_T("CreateDIBFromFile"), DIBres, g_bitmapLoader.GetLastErrMsg());
+-		return FinishPrivacyThread(0);
+-	}
++	// super远程桌面: the cover is drawn by OnPaintCover; the upstream picture is not loaded.
+ 
+ #ifdef WINDOWINJECTION_EXPORTS
+ 	g_zbid = ZBID_ABOVELOCK_UX;
+@@ -826,6 +822,50 @@ VOID OnPaintGdiPlus(HWND hwnd, HDC hdc)
+ 	}
+ }
+ 
++VOID OnPaintCover(HWND hwnd, HDC hdc)
++{
++	RECT rc;
++	if (!hdc || FALSE == GetClientRect(hwnd, &rc))
++	{
++		return;
++	}
++	FillRect(hdc, &rc, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
++	if (g_cover_text.empty())
++	{
++		return;
++	}
++
++	const int w = rc.right - rc.left;
++	const int h = rc.bottom - rc.top;
++	const int px = (std::max)(16, h / 32);
++	HFONT font = CreateFontW(-px, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
++		OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
++		L"Microsoft YaHei UI");
++	const HGDIOBJ old = font ? SelectObject(hdc, font) : nullptr;
++	SetBkMode(hdc, TRANSPARENT);
++	SetTextColor(hdc, RGB(0xC8, 0xCC, 0xD2));
++
++	const UINT fmt = DT_CENTER | DT_WORDBREAK | DT_NOPREFIX;
++	RECT text = { rc.left + w / 8, 0, rc.right - w / 8, 0 };
++	DrawTextW(hdc, g_cover_text.c_str(), -1, &text, fmt | DT_CALCRECT);
++	const int tw = text.right - text.left;
++	const int th = text.bottom - text.top;
++	text.left = rc.left + (w - tw) / 2;
++	text.right = text.left + tw;
++	text.top = rc.top + (h - th) / 2;
++	text.bottom = text.top + th;
++	DrawTextW(hdc, g_cover_text.c_str(), -1, &text, fmt);
++
++	if (old)
++	{
++		SelectObject(hdc, old);
++	}
++	if (font)
++	{
++		DeleteObject(font);
++	}
++}
++
+ #ifdef WINDOWINJECTION_EXPORTS
+ 
+ // https://docs.microsoft.com/en-us/windows/win32/dlls/dllmain

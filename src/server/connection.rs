@@ -1228,6 +1228,7 @@ impl Connection {
 
         if let Some(video_privacy_conn_id) = privacy_mode::get_privacy_mode_conn_id() {
             if video_privacy_conn_id == id {
+                crate::superdesk::privacy::before_restore(id).await;
                 let _ = Self::turn_off_privacy_to_msg(id, String::new());
             }
         }
@@ -1993,6 +1994,7 @@ impl Connection {
                 "supported_privacy_mode_impl".into(),
                 json!(privacy_mode::get_supported_privacy_mode_impl()),
             );
+            crate::superdesk::privacy::add_platform_additions(&mut platform_additions);
         }
         #[cfg(target_os = "macos")]
         {
@@ -4838,6 +4840,9 @@ impl Connection {
     }
 
     async fn toggle_privacy_mode(&mut self, t: TogglePrivacyMode) {
+        if !crate::superdesk::privacy::on_request(self.inner.id, &self.session_key(), &t) {
+            return;
+        }
         if t.on {
             self.turn_on_privacy(t.impl_key).await;
         } else {

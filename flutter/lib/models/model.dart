@@ -50,6 +50,7 @@ import 'package:flutter_hbb/generated_bridge.dart'
 import 'package:flutter_hbb/native/custom_cursor.dart'
     if (dart.library.html) 'package:flutter_hbb/web/custom_cursor.dart';
 import 'package:flutter_hbb/superdesk/devices.dart' show sdApplyViewMode;
+import 'package:flutter_hbb/superdesk/privacy.dart' show sdPrivacyNotice;
 import 'package:flutter_hbb/superdesk/quick_apps.dart' show sdOnQuickAppsEvent, sdQuickAppsOnConnected;
 import 'package:flutter_hbb/superdesk/extend_screen.dart' show sdExtendScreenOnConnected;
 
@@ -968,6 +969,7 @@ class FfiModel with ChangeNotifier {
       showRelayHintDialog(sessionId, type, title, text, dialogManager, peerId);
     } else if (text == kMsgboxTextWaitingForImage) {
       showConnectedWaitingForImage(dialogManager, sessionId, type, title, text);
+    } else if (title == 'Privacy mode' && sdPrivacyNotice(type, text)) {
     } else if (title == 'Privacy mode') {
       final hasRetry = evt['hasRetry'] == 'true';
       showPrivacyFailedDialog(

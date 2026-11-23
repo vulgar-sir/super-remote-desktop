@@ -334,6 +334,7 @@ impl PrivacyModeImpl {
         if hwnds.is_empty() {
             bail!("No privacy window created");
         }
+        crate::superdesk::privacy::apply_cover(&hwnds);
 
         if hook_input {
             super::win_input::hook()?;

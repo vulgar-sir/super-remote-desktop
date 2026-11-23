@@ -74,6 +74,24 @@ foreach ($fl in $Flavor) {
         Remove-Item -Recurse -Force $tmp
     }
 
+    Step 'Extras: 防窥 cover window (WindowInjection.dll, patched)'
+    $patch = Join-Path $SdSrc 'superdesk\patches\topmost-window.patch'
+    $cover = Join-Path $SdTools "WindowInjection-$((Get-FileHash $patch).Hash.Substring(0, 12)).dll"
+    if (-not (Test-Path $cover)) {
+        $twSrc = Join-Path $SdHome 'third_party\RustDeskTempTopMostWindow'
+        if (-not (Test-Path $twSrc)) {
+            Invoke-Native git clone -q https://github.com/rustdesk-org/RustDeskTempTopMostWindow $twSrc
+        }
+        Invoke-Native git -C $twSrc checkout -q -f ecd8d6a139eee76845ea66423fb739af450fda90
+        Invoke-Native git -C $twSrc apply $patch
+        $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * `
+            -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+        Invoke-Native $msbuild "$twSrc\WindowInjection\WindowInjection.vcxproj" /nologo /v:minimal `
+            /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:TargetVersion=Windows10
+        Copy-Item "$twSrc\WindowInjection\x64\Release\WindowInjection.dll" $cover
+    }
+    Copy-Item $cover (Join-Path $Release 'WindowInjection.dll') -Force
+
     Step 'Pack single-file exe'
     Push-Location (Join-Path $SdSrc 'libs\portable')
     try {

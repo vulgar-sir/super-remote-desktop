@@ -18,6 +18,7 @@
 | 8 | 录屏归档 | 按分组开启：被控会话自动录屏并上传控制台，可在线播放/下载，按天数自动清理 | 控制台 → 会话录屏 |
 | 9 | 访问策略 | 按分组：仅工作时间可连、仅公司账号电脑可连、必须被控端点击接受、附加任意 RustDesk 配置；随心跳 ~15 秒内生效 | 控制台 → 分组与访问策略 |
 | 10 | P2P 直连 | WebRTC 打洞：只用现有的一个端口做信令，画面/键鼠在两台设备间直传，不占服务器带宽；打不通自动走中继 | hbbs 补丁 + `enable-webrtc` |
+| 11 | 防窥 | 远控 Windows 电脑时对方屏幕黑屏（可显示提示文字）、本地键鼠锁住，远程照常操作；连接时默认开启，断开后锁屏再恢复 | 见下文“防窥” |
 
 ## 客户端界面
 
@@ -206,6 +207,26 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 - 注意：账号即钥匙。在别人的电脑上登录自己的账号，等于让那台电脑和自己的设备互相免密；用完请退出登录。
   客户端退出登录时若连不上控制台，控制台仍会认为该设备属于此账号，可在控制台删除该设备记录。
 
+## 防窥（第 11 项）
+
+自己的电脑放在公司或家里、人不在旁边时，远控它不让旁人看到屏幕；断开后自动恢复。基于 RustDesk 的隐私模式：
+
+- **被控端**：所有显示器盖上一层黑色窗口（默认显示提示文字），这层窗口不进入屏幕采集，所以远程这边照常看到并操作桌面；
+  本地键盘鼠标全部锁住（RustDesk 原有的本地 Ctrl+P 退出在防窥下不生效；Ctrl+Alt+Del 是系统级的，Windows 不允许拦截）。
+  黑色窗口由 `WindowInjection.dll`（[RustDeskTempTopMostWindow](https://github.com/rustdesk-org/RustDeskTempTopMostWindow)，MIT）
+  注入系统的 RuntimeBroker 进程创建，可盖住任务栏、开始菜单和锁屏。我们的补丁 `superdesk/patches/topmost-window.patch`
+  把原来的 RustDesk 图片换成“黑底 + 主控端发来的文字”（`WM_COPYDATA`），`build-windows.ps1` 拉取固定提交、打补丁、用 MSBuild 编译后放进安装包。
+- **主控端**：远控工具栏“防窥”按钮（蓝底 = 已开启）；设置 → 常规 → 防窥：
+  - 远控时自动开启（默认开）：画面出来时自动开启；**员工助手不会自动开启**（IT 帮员工处理问题时员工要看得到），工具栏可手动开；
+  - 对方屏幕显示：黑屏 + 提示文字（文字可自定义）/ 纯黑屏 / 关闭显示器（RustDesk 的虚拟显示器方式，对方需为安装版，不支持时自动改用黑屏）；
+  - 断开连接后：锁屏后恢复显示（默认，旁人看到的是锁屏界面）/ 直接恢复桌面。
+  - 这些设置随每次开启请求发给被控端（`TogglePrivacyMode.sd_cover`，字段号 1001），只影响本机去控制的设备。
+- **断开后恢复**：会话结束（主动断开、对方关窗口、网络中断后 30–60 秒超时）时先按设置锁屏，等锁屏出现再撤掉黑屏，中间不会露出桌面。
+  服务进程中途崩溃留下的黑屏，服务重启时锁屏后撤掉。
+- **断线重连**：网络抖动重连时，旧连接还占着防窥直到超时；新连接（同一会话）会接管防窥，避免旧连接超时后屏幕露出来。
+- 被控端在 PeerInfo 里报告 `sd_privacy_cover`（装有黑屏组件），主控端只对报告了的设备自动开启/显示按钮，旧版本设备不会弹失败提示。
+- 开启/关闭的提示改为轻提示（toast），不再弹对话框。
+
 ## P2P 直连（第 10 项）
 
 默认开启，无需额外端口：客户端内置 `enable-webrtc=Y` 与 `ice-servers`（STUN 列表，可在
@@ -237,6 +258,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
 | `libs/base/protos/message.proto` | 新增 `SdQuickApps`（Misc 字段 1001），快速启动的请求/应用列表/启动；`Hash.sd_account_login`、`LoginRequest.sd_account_ticket`（同账号免密） |
 | `src/server/connection.rs`（登录挑战标记 + 登录分支）、`src/client.rs`（`handle_hash` 申请票据、`create_login_msg` 附带票据） | 同账号免密的挂钩（逻辑在 `src/superdesk/same_account.rs`） |
+| `src/server/connection.rs`（`toggle_privacy_mode` 入口、会话结束撤防窥前锁屏、PeerInfo 报告）、`src/client/io_loop.rs`（自动开启、解析 `sd_privacy_cover`）、`src/ui_session_interface.rs`（开启请求附带设置）、`src/privacy_mode/win_topmost_window.rs`（显示前下发文字）、`src/privacy_mode/win_input.rs`（防窥下屏蔽 Ctrl+P 退出）、`src/server.rs`（启动时清理残留黑屏）、`flutter/lib/models/model.dart`（提示改 toast）、`remote_toolbar.dart`（防窥按钮） | 防窥的挂钩（逻辑在 `src/superdesk/privacy.rs`、`flutter/lib/superdesk/privacy.dart`） |
 | `src/server/connection.rs`、`src/client/io_loop.rs`、`src/ui_session_interface.rs` | 快速启动的三处挂钩：被控端应答、主控端转发给界面、`toggle_option` 发送命令（逻辑在 `src/superdesk/quick_apps.rs`） |
 | `Cargo.toml` | winapi 加 `wingdi` 特性（读取快捷方式图标） |
 | `flutter/lib/desktop/widgets/remote_toolbar.dart` | 工具栏 UU 风格（`_sdUuToolbar`）+ 快速启动按钮 |

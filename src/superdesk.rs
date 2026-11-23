@@ -7,6 +7,7 @@ use base::config::keys;
 use hbb_common::{config, log};
 use std::collections::HashMap;
 
+pub mod privacy;
 pub mod quick_apps;
 pub mod same_account;
 

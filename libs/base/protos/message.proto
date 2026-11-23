@@ -632,6 +632,14 @@ message ToggleVirtualDisplay {
 message TogglePrivacyMode {
   string impl_key = 1;
   bool on = 2;
+  // super远程桌面 防窥: what the controlled side's screen shows and what happens after the session
+  SdPrivacyCover sd_cover = 1001;
+}
+
+message SdPrivacyCover {
+  string text = 1;          // shown on the black screen; empty: black only
+  bool keep_unlocked = 2;   // after the session: restore the desktop instead of locking first
+  bool auto = 3;            // sent by the controller's "on by default", not a click
 }
 
 message PermissionInfo {

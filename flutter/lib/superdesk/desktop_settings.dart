@@ -14,6 +14,7 @@ import 'package:flutter_hbb/models/server_model.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 
+import 'privacy.dart';
 import 'superdesk.dart';
 import 'theme.dart';
 
@@ -49,6 +50,13 @@ class SdSettingsPage extends StatefulWidget {
 class _SdSettingsPageState extends State<SdSettingsPage> {
   late SdSettingsTab _tab = widget.initialTab;
   bool _locked = bind.mainIsInstalled();
+  final _privacyText = TextEditingController(text: bind.mainGetOptionSync(key: kSdOptionPrivacyText));
+
+  @override
+  void dispose() {
+    _privacyText.dispose();
+    super.dispose();
+  }
 
   static const _tabs = {SdSettingsTab.general: '常规', SdSettingsTab.safety: '安全', SdSettingsTab.network: '网络'};
 
@@ -156,6 +164,7 @@ class _SdSettingsPageState extends State<SdSettingsPage> {
               desc: '控制其他设备时自动录屏，保存位置可在“更多常规设置”中修改',
               trailing: _optSwitch(p, kOptionAllowAutoRecordOutgoing, local: true)),
         ]),
+      if (!bind.isIncomingOnly()) _privacyCard(p),
       _card(p, [
         _row(p,
             icon: Icons.system_update_alt_rounded,
@@ -165,6 +174,68 @@ class _SdSettingsPageState extends State<SdSettingsPage> {
       ]),
       _moreCard(p, SettingsTabKey.general, '更多常规设置', '语言、录屏目录、硬件编解码等 RustDesk 完整设置'),
     ];
+  }
+
+  /// 防窥 (src/superdesk/privacy.rs): sent with each turn-on, so it applies to the devices this one controls.
+  Widget _privacyCard(SdPalette p) {
+    String opt(String k) => bind.mainGetOptionSync(key: k);
+    Future<void> set(String k, String v) async {
+      await bind.mainSetOption(key: k, value: v);
+      _refresh();
+    }
+
+    final cover = opt(kSdOptionPrivacyCover);
+    return _card(p, [
+      _row(p,
+          icon: Icons.visibility_off_outlined,
+          title: '远控时自动开启防窥',
+          desc: '控制 Windows 电脑时对方屏幕黑屏、本地键鼠锁住，你这边照常操作；工具栏可随时开关。员工助手不会自动开启',
+          trailing: sdSwitch(p, opt(kSdOptionPrivacyAuto) != 'N',
+              isOptionFixed(kSdOptionPrivacyAuto) ? null : (v) => set(kSdOptionPrivacyAuto, v ? '' : 'N'))),
+      _row(p,
+          title: '防窥时对方屏幕显示',
+          compact: true,
+          trailing: _dropdown(
+              p,
+              cover == 'black' || cover == 'display-off' ? cover : '',
+              const {'': '黑屏 + 提示文字', 'black': '纯黑屏', 'display-off': '关闭显示器（对方需为安装版）'},
+              isOptionFixed(kSdOptionPrivacyCover) ? null : (v) => set(kSdOptionPrivacyCover, v),
+              width: 230)),
+      if (cover != 'black' && cover != 'display-off')
+        _row(p,
+            title: '提示文字',
+            compact: true,
+            trailing: SizedBox(
+              width: 300,
+              height: 32,
+              child: TextField(
+                controller: _privacyText,
+                enabled: !isOptionFixed(kSdOptionPrivacyText),
+                maxLength: 60,
+                style: TextStyle(fontSize: 13.5, color: p.text),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: kSdPrivacyDefaultText,
+                  hintStyle: TextStyle(fontSize: 13.5, color: p.hint),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: p.dark ? p.line : const Color(0xFFDADCDD))),
+                ),
+                onChanged: (v) => bind.mainSetOption(key: kSdOptionPrivacyText, value: v.trim()),
+              ),
+            )),
+      _row(p,
+          title: '断开连接后',
+          compact: true,
+          trailing: _dropdown(
+              p,
+              opt(kSdOptionPrivacyAfter) == 'restore' ? 'restore' : '',
+              const {'': '锁屏后恢复显示', 'restore': '直接恢复桌面'},
+              isOptionFixed(kSdOptionPrivacyAfter) ? null : (v) => set(kSdOptionPrivacyAfter, v),
+              width: 230)),
+    ]);
   }
 
   List<Widget> _safety(SdPalette p) {

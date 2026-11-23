@@ -212,7 +212,9 @@ pub extern "system" fn privacy_mode_hook_keyboard(
             match w_param2 {
                 WM_KEYDOWN => {
                     // Disable all keys other than P and Ctrl.
-                    if ![80, 162, 163].contains(&(*ks).vkCode) {
+                    if ![80, 162, 163].contains(&(*ks).vkCode)
+                        || !crate::superdesk::privacy::local_exit_allowed()
+                    {
                         return 1;
                     }
 
