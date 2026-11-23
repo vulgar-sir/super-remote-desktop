@@ -24,7 +24,8 @@
 布局、文案和交互流程对齐 **UU远程**（按其桌面版 4.48 与手机版宣传图逐页对照），品牌、Logo 与图标为自有素材；
 只改界面，RustDesk 原有功能全部保留：
 
-- **Windows 完整版**：48px 标题栏（Logo + 名称，右侧账号 / 菜单：下载中心、如何添加设备、关于、检查更新）；
+- **Windows 完整版**：48px 标题栏（Logo + 名称；右侧 无线副屏 / 消息中心 / 账号 / 菜单 | 最小化 / 关闭，六个图标为同一套细线图标，
+  悬停浅灰圆角底、关闭悬停红底；菜单：下载中心、如何添加设备、关于、检查更新；账号：头像卡片 + 退出登录）；
   浅灰侧栏分组 **我的设备**（最近 6 台，带在线绿点）/ **全部设备** / **远程协助**（开始协助、收藏设备）/ **设置**；
   - **远程协助**：“本设备”卡片（允许他人远程协助开关、本设备ID、验证方式下拉、验证码查看/刷新、复制并分享）
     + “远控伙伴设备”卡片（伙伴的设备ID + 连接）；
@@ -224,7 +225,7 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `flutter/lib/common/widgets/login.dart` | 登录框下方挂“注册账号”入口（`sdRegisterLink`，调用控制台 `/api/superdesk/register`） |
 | `flutter/lib/superdesk/theme.dart`、`desktop_home.dart`、`mobile_home.dart`、`devices.dart`（新增） | 新界面（对齐 UU远程）：配色组件、桌面/手机主界面、设备数据 |
 | `common.dart`（`MyTheme.accent` 改为 #3A7BFC）、`desktop/pages/server_page.dart`（被控卡片 `_sdUuCm`、断开远控按钮） | 被控窗口与全局主色 |
-| `desktop_tab_page.dart` + `tabbar_widget.dart`（`sdBarHeight`/`sdLeading`）、`desktop_setting_page.dart`（`sdTopTabs`、卡片/开关样式）、`main.dart`（窗口最小尺寸）、`mobile/pages/home_page.dart`（手机三标签）、`server_page.dart`（聊天按钮改为打开聊天页） | 新界面挂接 |
+| `desktop_tab_page.dart`（`sdBarHeight`/`sdLeading`，完整版隐藏默认最小化/关闭改由 `sdTitleBarTail` 绘制）+ `tabbar_widget.dart`（`sdBarHeight`/`sdLeading`）、`desktop_setting_page.dart`（`sdTopTabs`、卡片/开关样式）、`main.dart`（窗口最小尺寸）、`mobile/pages/home_page.dart`（手机三标签）、`server_page.dart`（聊天按钮改为打开聊天页） | 新界面挂接 |
 | `desktop_home_page.dart`（build / buildInstallCard / buildLeftPane 挂接）、`mobile/pages/connection_page.dart`、`server_page.dart`、`home_page.dart` | 新界面挂接：只替换外观，原有逻辑不变 |
 | `flutter/windows/runner/Runner.rc`、`libs/portable/Cargo.toml` | 程序名称/描述（构建时按版本替换） |
 | `flutter/android/app/build.gradle`、`AndroidManifest.xml` | 包名 `com.superdesk.remote`（可与官方 RustDesk 共存）、应用名 |

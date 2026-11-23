@@ -99,6 +99,8 @@ class _DesktopTabPageState extends State<DesktopTabPage> {
               controller: tabController,
               sdBarHeight: sdTitleBarHeight,
               showMaximize: sdTitleBarShowMaximize,
+              showMinimize: !sdTitleBarOwnControls,
+              showClose: !sdTitleBarOwnControls,
               sdLeading: sdTitleBarLeading(context),
               tail: sdTitleBarTail(context) ?? Offstage(
                 offstage: bind.isIncomingOnly() || bind.isDisableSettings(),

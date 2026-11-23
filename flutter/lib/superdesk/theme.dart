@@ -328,7 +328,21 @@ class _WinLogo extends CustomPainter {
 
 /// Sidebar / page icons in the reference style: thin line icons for section headers, two-tone blue
 /// glyphs for entries. Drawn on a 20x20 grid and scaled to [size].
-enum SdGlyph { devices, assist, allDevices, startAssist, favorites, emptyBox }
+enum SdGlyph {
+  devices,
+  assist,
+  allDevices,
+  startAssist,
+  favorites,
+  emptyBox,
+  // title bar: one stroke weight and colour for all of them
+  barScreens,
+  barBell,
+  barUser,
+  barMenu,
+  barMinimize,
+  barClose,
+}
 
 class SdIcon extends StatelessWidget {
   final SdGlyph glyph;
@@ -340,6 +354,104 @@ class SdIcon extends StatelessWidget {
   Widget build(BuildContext context) =>
       CustomPaint(size: Size.square(size), painter: _GlyphPainter(glyph, color ?? SdPalette(context).text));
 }
+
+/// Main-window title-bar button: line glyph, rounded grey square on hover (red for close), no ripple and
+/// no focus ring. [onTap] gets the button's own context so a menu can open under it.
+class SdBarButton extends StatefulWidget {
+  final SdGlyph glyph;
+  final String tip;
+  final void Function(BuildContext context) onTap;
+  final bool danger;
+  final Widget? badge;
+  const SdBarButton(this.glyph, this.tip, this.onTap, {Key? key, this.danger = false, this.badge}) : super(key: key);
+
+  @override
+  State<SdBarButton> createState() => _SdBarButtonState();
+}
+
+class _SdBarButtonState extends State<SdBarButton> {
+  bool _hover = false;
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = SdPalette(context);
+    final red = widget.danger && _hover;
+    final bg = red
+        ? const Color(0xFFE5484D)
+        : _down
+            ? (p.dark ? const Color(0xFF323A47) : const Color(0xFFD8DEE2))
+            : _hover
+                ? p.soft
+                : Colors.transparent;
+    return Tooltip(
+      message: widget.tip,
+      waitDuration: const Duration(milliseconds: 600),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = _down = false),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (_) => setState(() => _down = true),
+          onTapCancel: () => setState(() => _down = false),
+          onTap: () {
+            setState(() => _down = false);
+            widget.onTap(context);
+          },
+          child: SizedBox(
+            width: 52,
+            height: 48,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 100),
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+                child: Stack(clipBehavior: Clip.none, children: [
+                  SdIcon(widget.glyph, size: 22, color: red ? Colors.white : p.text),
+                  if (widget.badge != null) Positioned(right: -7, top: -5, child: IgnorePointer(child: widget.badge!)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Opens a menu under a title-bar button, right-aligned with it (the menu takes the button's context).
+Future<T?> sdBarMenu<T>(BuildContext context, List<PopupMenuEntry<T>> items) {
+  final p = SdPalette(context);
+  final box = context.findRenderObject() as RenderBox;
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+  final rect = Rect.fromPoints(box.localToGlobal(Offset(0, box.size.height - 6), ancestor: overlay),
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay));
+  return showMenu<T>(
+    context: context,
+    position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
+    items: items,
+    color: p.card,
+    elevation: 6,
+    shadowColor: Colors.black38,
+    surfaceTintColor: Colors.transparent,
+    constraints: const BoxConstraints(minWidth: 168),
+    menuPadding: const EdgeInsets.symmetric(vertical: 6),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: p.line)),
+  );
+}
+
+PopupMenuItem<T> sdBarMenuItem<T>(SdPalette p, T value, IconData icon, String label) => PopupMenuItem<T>(
+      value: value,
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        Icon(icon, size: 18, color: p.text),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(fontSize: 14, color: p.text)),
+      ]),
+    );
 
 class _GlyphPainter extends CustomPainter {
   final SdGlyph glyph;
@@ -445,6 +557,59 @@ class _GlyphPainter extends CustomPainter {
               ..close(),
             fill(c3));
         canvas.drawPath(_star(const Offset(10, 12.8), 2.6, 1.1), fill(Colors.white));
+        break;
+      case SdGlyph.barScreens: // two overlapping windows, the back one peeking out top-right
+        stroke.strokeWidth = 1.3;
+        final front = _rr(2.6, 7, 13.6, 16.4, 2);
+        canvas.save();
+        canvas.clipPath(Path.combine(PathOperation.difference, Path()..addRect(const Rect.fromLTWH(0, 0, 20, 20)),
+            Path()..addRRect(front.inflate(1.6))));
+        canvas.drawRRect(_rr(6.4, 3.6, 17.4, 13, 2), stroke);
+        canvas.restore();
+        canvas.drawRRect(front, stroke);
+        break;
+      case SdGlyph.barBell:
+        stroke.strokeWidth = 1.3;
+        canvas.drawPath(
+            Path()
+              ..moveTo(5.4, 14.4)
+              ..lineTo(5.4, 9.2)
+              ..arcToPoint(const Offset(14.6, 9.2), radius: const Radius.circular(4.6))
+              ..lineTo(14.6, 14.4),
+            stroke);
+        canvas.drawLine(const Offset(3.6, 14.4), const Offset(16.4, 14.4), stroke);
+        canvas.drawLine(const Offset(10, 2.8), const Offset(10, 4.6), stroke);
+        canvas.drawPath(
+            Path()
+              ..moveTo(8.2, 16.6)
+              ..arcToPoint(const Offset(11.8, 16.6), radius: const Radius.circular(1.8), clockwise: false),
+            stroke);
+        break;
+      case SdGlyph.barUser: // head + bowl-shaped shoulders
+        stroke.strokeWidth = 1.3;
+        canvas.drawCircle(const Offset(10, 5.8), 2.8, stroke);
+        canvas.drawPath(
+            Path()
+              ..moveTo(4.2, 11.8)
+              ..lineTo(15.8, 11.8)
+              ..arcToPoint(const Offset(4.2, 11.8), radius: const Radius.circular(5.8))
+              ..close(),
+            stroke);
+        break;
+      case SdGlyph.barMenu:
+        stroke.strokeWidth = 1.3;
+        for (final y in [4.6, 10.0, 15.4]) {
+          canvas.drawLine(Offset(3.4, y), Offset(16.6, y), stroke);
+        }
+        break;
+      case SdGlyph.barMinimize:
+        stroke.strokeWidth = 1.3;
+        canvas.drawLine(const Offset(4.6, 10), const Offset(15.4, 10), stroke);
+        break;
+      case SdGlyph.barClose:
+        stroke.strokeWidth = 1.3;
+        canvas.drawLine(const Offset(5, 5), const Offset(15, 15), stroke);
+        canvas.drawLine(const Offset(15, 5), const Offset(5, 15), stroke);
         break;
     }
     canvas.restore();

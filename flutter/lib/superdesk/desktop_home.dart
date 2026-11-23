@@ -174,16 +174,27 @@ Widget sdTitleBarLeading(BuildContext context) {
   ]);
 }
 
-/// Right side of the main-window title bar (account + menu); null keeps the default.
+/// The full client draws its own minimise / close at the end of [sdTitleBarTail], in the same style as
+/// the other title-bar buttons (compatible UI mode keeps the system title bar and its buttons).
+bool get sdTitleBarOwnControls => !bind.isIncomingOnly() && !kUseCompatibleUiMode && !isMacOS;
+
+/// Right side of the main-window title bar (account + menu + window buttons); null keeps the default.
 Widget? sdTitleBarTail(BuildContext context) {
   if (bind.isIncomingOnly()) return null;
   final p = SdPalette(context);
   return Row(mainAxisSize: MainAxisSize.min, children: [
-    sdIconButton(p, Icons.filter_none_rounded, '无线副屏', _extendScreenHelp, color: p.text, size: 18),
+    SdBarButton(SdGlyph.barScreens, '无线副屏', (_) => _extendScreenHelp()),
     sdNoticeBell(p),
     if (!bind.isDisableAccount()) _accountButton(p),
-    _menuButton(context, p),
-    Container(width: 1, height: 18, color: p.divider, margin: const EdgeInsets.symmetric(horizontal: 6)),
+    SdBarButton(SdGlyph.barMenu, '菜单', _openMenu),
+    if (sdTitleBarOwnControls) ...[
+      Container(width: 1, height: 20, color: p.divider, margin: const EdgeInsets.symmetric(horizontal: 8)),
+      SdBarButton(SdGlyph.barMinimize, '最小化', (_) => windowManager.minimize()),
+      SdBarButton(SdGlyph.barClose, '关闭', (_) => Future.delayed(Duration.zero, () => windowManager.close()),
+          danger: true),
+      const SizedBox(width: 4),
+    ] else
+      Container(width: 1, height: 18, color: p.divider, margin: const EdgeInsets.symmetric(horizontal: 6)),
   ]);
 }
 
@@ -192,64 +203,77 @@ final sdHomeSettingsRequest = Rxn<SettingsTabKey>();
 
 Widget _accountButton(SdPalette p) => Obx(() {
       final name = gFFI.userModel.userName.value;
-      if (name.isEmpty) {
-        return sdIconButton(p, Icons.person_outline, '登录账号', () => loginDialog(), color: p.text, size: 20);
-      }
-      return PopupMenuButton<int>(
-        tooltip: name,
-        offset: const Offset(0, 40),
-        icon: Icon(Icons.person_rounded, color: kSdAccent, size: 21),
-        itemBuilder: (_) => [
-          PopupMenuItem(enabled: false, child: Text(name, style: TextStyle(color: p.text, fontWeight: FontWeight.w600))),
-          const PopupMenuDivider(),
-          const PopupMenuItem(value: 1, child: Text('退出登录')),
-        ],
-        onSelected: (v) {
-          if (v == 1) gFFI.userModel.logOut();
-        },
-      );
+      if (name.isEmpty) return SdBarButton(SdGlyph.barUser, '登录账号', (_) => loginDialog());
+      return SdBarButton(SdGlyph.barUser, gFFI.userModel.displayNameOrUserName, _openAccountMenu);
     });
 
-Widget _menuButton(BuildContext context, SdPalette p) => PopupMenuButton<int>(
-      tooltip: '菜单',
-      offset: const Offset(0, 40),
-      icon: Icon(Icons.menu, color: p.text, size: 20),
-      itemBuilder: (_) => [
-        _menuItem(1, Icons.download_for_offline_outlined, '下载中心'),
-        _menuItem(2, Icons.help_outline_rounded, '如何添加设备'),
-        _menuItem(3, Icons.info_outline_rounded, '关于'),
-        const PopupMenuDivider(),
-        _menuItem(4, Icons.upgrade_rounded, '检查更新'),
-      ],
-      onSelected: (v) async {
-        switch (v) {
-          case 1:
-            final api = await sdApiServer();
-            if (api.isNotEmpty) launchUrl(Uri.parse('$api/download/'));
-            break;
-          case 2:
-            _howToAddDialog();
-            break;
-          case 3:
-            sdHomeSettingsRequest.value = SettingsTabKey.about;
-            break;
-          case 4:
-            final u = await superdeskCheckUpdate();
-            if (u == null) {
-              showToast('已是最新版本');
-            } else {
-              superdeskOpenUpdate(u);
-            }
-            break;
-        }
-      },
-    );
+Future<void> _openAccountMenu(BuildContext context) async {
+  final p = SdPalette(context);
+  final user = gFFI.userModel;
+  final shown = user.displayNameOrUserName;
+  final v = await sdBarMenu<int>(context, [
+    PopupMenuItem<int>(
+      enabled: false,
+      height: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(children: [
+        Container(
+          width: 36,
+          height: 36,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(color: kSdAccent, shape: BoxShape.circle),
+          child: Text(shown.isEmpty ? '?' : shown.characters.first.toUpperCase(),
+              style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.w600)),
+        ),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(shown,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, color: p.text, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text(shown == user.userName.value ? '已登录' : '账号：${user.userName.value}',
+                overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: p.muted)),
+          ]),
+        ),
+      ]),
+    ),
+    const PopupMenuDivider(height: 9),
+    sdBarMenuItem(p, 1, Icons.logout_rounded, '退出登录'),
+  ]);
+  if (v == 1) user.logOut();
+}
 
-PopupMenuItem<int> _menuItem(int v, IconData icon, String label) => PopupMenuItem(
-      value: v,
-      height: 40,
-      child: Row(children: [Icon(icon, size: 18), const SizedBox(width: 12), Text(label)]),
-    );
+Future<void> _openMenu(BuildContext context) async {
+  final p = SdPalette(context);
+  final v = await sdBarMenu<int>(context, [
+    sdBarMenuItem(p, 1, Icons.file_download_outlined, '下载中心'),
+    sdBarMenuItem(p, 2, Icons.add_circle_outline_rounded, '如何添加设备'),
+    sdBarMenuItem(p, 3, Icons.info_outline_rounded, '关于'),
+    const PopupMenuDivider(height: 9),
+    sdBarMenuItem(p, 4, Icons.arrow_circle_up_rounded, '检查更新'),
+  ]);
+  switch (v) {
+    case 1:
+      final api = await sdApiServer();
+      if (api.isNotEmpty) launchUrl(Uri.parse('$api/download/'));
+      break;
+    case 2:
+      _howToAddDialog();
+      break;
+    case 3:
+      sdHomeSettingsRequest.value = SettingsTabKey.about;
+      break;
+    case 4:
+      final u = await superdeskCheckUpdate();
+      if (u == null) {
+        showToast('已是最新版本');
+      } else {
+        superdeskOpenUpdate(u);
+      }
+      break;
+  }
+}
 
 void _extendScreenHelp() {
   gFFI.dialogManager.show((setState, close, context) => CustomAlertDialog(

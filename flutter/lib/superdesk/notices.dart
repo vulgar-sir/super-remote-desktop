@@ -67,25 +67,21 @@ class SdNotices {
 /// Title-bar bell with the unread count (red badge), opens the message centre.
 Widget sdNoticeBell(SdPalette p) => Obx(() {
       final unread = SdNotices.items.where((n) => !SdNotices.read.contains(n.id)).length;
-      return Stack(clipBehavior: Clip.none, children: [
-        sdIconButton(p, Icons.notifications_none_rounded, '消息中心', sdShowNoticeCenter, color: p.text, size: 21),
-        if (unread > 0)
-          Positioned(
-            right: 3,
-            top: 3,
-            child: IgnorePointer(
-              child: Container(
-                height: 15,
-                constraints: const BoxConstraints(minWidth: 15),
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: const Color(0xFFF5455C), borderRadius: BorderRadius.circular(8)),
-                child: Text(unread > 99 ? '99+' : '$unread',
-                    style: const TextStyle(fontSize: 10, color: Colors.white, height: 1.1)),
-              ),
-            ),
-          ),
-      ]);
+      return SdBarButton(SdGlyph.barBell, '消息中心', (_) => sdShowNoticeCenter(),
+          badge: unread > 0
+              ? Container(
+                  height: 16,
+                  constraints: const BoxConstraints(minWidth: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF5455C),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: p.side, width: 1.5)),
+                  child: Text(unread > 99 ? '99+' : '$unread',
+                      style: const TextStyle(fontSize: 10, color: Colors.white, height: 1.1)),
+                )
+              : null);
     });
 
 void sdShowNoticeCenter() {
