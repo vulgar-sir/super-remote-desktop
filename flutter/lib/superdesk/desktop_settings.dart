@@ -17,6 +17,9 @@ import 'package:provider/provider.dart';
 import 'superdesk.dart';
 import 'theme.dart';
 
+/// Same-account logins without the device code (src/superdesk/same_account.rs); "N" turns them off.
+const kSdOptionAllowSameAccount = 'superdesk-allow-same-account';
+
 enum SdSettingsTab { general, safety, network }
 
 /// The tab of this page that shows [k], or null when only the full RustDesk page has it.
@@ -169,6 +172,22 @@ class _SdSettingsPageState extends State<SdSettingsPage> {
     final bool? fake = access == 'full' ? true : (access == 'view' ? false : null);
     final accessKey = access == 'full' || access == 'view' ? access : '$defaultOptionAccessMode';
     return [
+      if (!bind.isOutgoingOnly())
+        _card(p, [
+          _row(p,
+              icon: Icons.devices_outlined,
+              title: '允许同账号控制本设备',
+              desc: '登录同一账号的设备连接本机时无需验证码',
+              trailing: sdSwitch(
+                  p,
+                  bind.mainGetOptionSync(key: kSdOptionAllowSameAccount) != 'N',
+                  _locked || isOptionFixed(kSdOptionAllowSameAccount)
+                      ? null
+                      : (v) async {
+                          await bind.mainSetOption(key: kSdOptionAllowSameAccount, value: v ? '' : 'N');
+                          _refresh();
+                        })),
+        ]),
       if (!bind.isOutgoingOnly())
         Builder(builder: (context) {
           final svcStopped = Get.find<RxBool>(tag: 'stop-service');

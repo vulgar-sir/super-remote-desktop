@@ -3894,6 +3894,7 @@ impl LoginConfigHandler {
             _ => {}
         }
 
+        crate::superdesk::same_account::attach(&self.id, &mut lr);
         let mut msg_out = Message::new();
         msg_out.set_login_request(lr);
         msg_out
@@ -4762,9 +4763,14 @@ pub async fn handle_hash(
         return true;
     }
 
+    // super远程桌面: a same-account ticket replaces the password prompt
+    let sd_ticket = password.is_empty() && !request_approval && {
+        let id = lc.read().unwrap().id.clone();
+        crate::superdesk::same_account::fetch_ticket(&id, &hash).await
+    };
     let password = if password.is_empty() {
         // login without password, the remote side can click accept
-        if !request_approval {
+        if !request_approval && !sd_ticket {
             interface.msgbox("input-password", "Password Required", "", "");
         }
         Vec::new()

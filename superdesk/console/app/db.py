@@ -174,6 +174,13 @@ CREATE TABLE IF NOT EXISTS events (              -- admin-visible operation log
     text TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS sd_tickets (           -- single-use same-account login tickets
+    ticket TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    from_id TEXT NOT NULL,                      -- connecting device
+    target_id TEXT NOT NULL,                    -- device being connected to
+    created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS notices (             -- announcements shown in the client's 消息中心
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,

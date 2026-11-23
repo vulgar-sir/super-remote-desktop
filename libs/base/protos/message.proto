@@ -86,6 +86,8 @@ message LoginRequest {
   string avatar = 17;
   bytes trusted_device_v2_token = 18;
   bool trusted_device_v2_supported = 19;
+  // super远程桌面: single-use console ticket for a same-account login without the device password
+  string sd_account_ticket = 1001;
 }
 
 message Terminal {
@@ -333,6 +335,8 @@ message CursorPosition {
 message Hash {
   string salt = 1;
   string challenge = 2;
+  // super远程桌面: this device accepts same-account logins (LoginRequest.sd_account_ticket)
+  bool sd_account_login = 1001;
 }
 
 enum ClipboardFormat {

@@ -33,6 +33,8 @@
   - **同账号设备**：各设备登录同一控制台账号后自动互相出现在“我的设备 / 全部设备”（手机端“设备”页），无需连接过或收藏；
     数据来自控制台 `/api/peers`（按账号名匹配），客户端每 60 秒刷新一次，手机端下拉也会刷新；
   - 设备列表合并顺序：收藏 → 同账号设备 → 通讯录 → 最近连接（按 ID 去重）；
+  - **同账号免密**：连接登录同一账号的设备时不用输验证码（设置 → 安全 →“允许同账号控制本设备”，默认开启；
+    被控端设为“本机点击接受”时仍需点击）。见下文“同账号免密”；
   - **设备页**：在线/离线胶囊 + 名称 + ⋮（备注名、收藏、复制ID、删除记录），预览卡“进入桌面 →”，
     动作栏 文件传输 / 观看模式 / 终端 / 端口映射 / 更多（远程摄像头、RDP、复制ID）；“观看模式”连接后自动打开仅观看，“进入桌面”恢复完全控制；
   - **设置**：对齐 UU——常规 / 安全 / 网络 三个标签，每项一张卡片（图标 + 标题 + 灰色说明 + 开关/下拉/按钮）：
@@ -187,6 +189,23 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 默认安装员工助手版（`-Flavor full` 安装完整版），注册为开机服务、设置固定密码，并上报到控制台“部署记录/设备”。
 也可下载 `deploy-superdesk.bat` + `.ps1` 放同一目录双击运行，或用于组策略启动脚本（`deploy-superdesk.bat 密码`）。
 
+## 同账号免密
+
+两台设备登录同一个控制台账号后，互相连接不需要验证码（对齐 UU“允许同账号控制本设备”）：
+
+1. 被控端在登录挑战（`Hash`）里标记 `sd_account_login`（开关开启、且不是“仅点击接受”模式时）；
+2. 主控端已登录账号、且本次没有可用密码时，不弹密码框，而是向控制台申请票据
+   `POST /api/superdesk/same-account/ticket`（Bearer 令牌）。控制台只在“令牌属于发起设备、目标设备当前登录的是同一账号”时
+   签发，票据 60 秒有效、只能用一次，绑定发起设备和目标设备；
+3. 票据放在 `LoginRequest.sd_account_ticket` 里发给被控端，被控端用 `POST /api/superdesk/same-account/verify` 向控制台核验
+   （无论成败票据都会作废），通过即按密码正确处理（双重认证、ID 白名单、访问策略照常生效），控制台“操作记录”记一条；
+   不通过则回“需要密码”，主控端照常弹出密码框，被控端照常可点击接受。
+
+- 协议字段都在客户端的 `libs/base/protos/message.proto`（字段号 1001），服务器 hbbs 不用升级；新旧版本混用时自动走原来的密码流程。
+- 关闭：被控端设置里关掉开关（选项 `superdesk-allow-same-account` = `N`），也可在控制台分组策略“附加 RustDesk 配置”里统一下发。
+- 注意：账号即钥匙。在别人的电脑上登录自己的账号，等于让那台电脑和自己的设备互相免密；用完请退出登录。
+  客户端退出登录时若连不上控制台，控制台仍会认为该设备属于此账号，可在控制台删除该设备记录。
+
 ## P2P 直连（第 10 项）
 
 默认开启，无需额外端口：客户端内置 `enable-webrtc=Y` 与 `ice-servers`（STUN 列表，可在
@@ -216,7 +235,8 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `src/hbbs_http/record_upload.rs` | 录屏上传开关可由控制台策略 `superdesk-record-upload` 打开（上游此开关无人设置） |
 | `superdesk/server/hbbs/tcp-register.patch`、`proto-webrtc.patch`（服务端） | hbbs 支持 TCP/WebSocket 注册与 WebRTC 信令转发，见上文“hbbs 补丁” |
 | `flutter/lib/superdesk/superdesk.dart`（新增）、`desktop_home_page.dart`、`mobile/pages/home_page.dart` | 升级检查、员工端“请求 IT 协助”、录屏提示、启动时上报版本 |
-| `libs/base/protos/message.proto` | 新增 `SdQuickApps`（Misc 字段 1001），快速启动的请求/应用列表/启动 |
+| `libs/base/protos/message.proto` | 新增 `SdQuickApps`（Misc 字段 1001），快速启动的请求/应用列表/启动；`Hash.sd_account_login`、`LoginRequest.sd_account_ticket`（同账号免密） |
+| `src/server/connection.rs`（登录挑战标记 + 登录分支）、`src/client.rs`（`handle_hash` 申请票据、`create_login_msg` 附带票据） | 同账号免密的挂钩（逻辑在 `src/superdesk/same_account.rs`） |
 | `src/server/connection.rs`、`src/client/io_loop.rs`、`src/ui_session_interface.rs` | 快速启动的三处挂钩：被控端应答、主控端转发给界面、`toggle_option` 发送命令（逻辑在 `src/superdesk/quick_apps.rs`） |
 | `Cargo.toml` | winapi 加 `wingdi` 特性（读取快捷方式图标） |
 | `flutter/lib/desktop/widgets/remote_toolbar.dart` | 工具栏 UU 风格（`_sdUuToolbar`）+ 快速启动按钮 |

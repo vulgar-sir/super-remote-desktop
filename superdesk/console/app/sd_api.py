@@ -1,6 +1,7 @@
 """super远程桌面 extensions used by our own client / scripts (no login: called from employee PCs)."""
 import os
 import re
+import secrets
 import time
 from collections import defaultdict, deque
 
@@ -203,3 +204,67 @@ def wallpaper_get(device_id: str, authorization: str | None = Header(default=Non
         png = f.read(8) == PNG_MAGIC
     return FileResponse(path, media_type="image/png" if png else "image/jpeg",
                         headers={"Cache-Control": "private, max-age=600"})
+
+
+# ---------------------------------------------------------------- 同账号免密
+TICKET_TTL = 60
+
+
+def _dev_label(dev_id: str) -> str:
+    d = db.one("SELECT alias, hostname FROM devices WHERE id=?", (dev_id,))
+    name = (d and (d["alias"] or d["hostname"])) or ""
+    return f"{name}（{dev_id}）" if name else dev_id
+
+
+class TicketReq(BaseModel):
+    id: str
+    target: str
+
+
+@router.post("/same-account/ticket")
+def same_account_ticket(b: TicketReq, req: Request, authorization: str | None = Header(default=None)):
+    """A signed-in client wants to connect to `target` without its password. Allowed only when the token
+    was issued to device `id` and `target` is signed in to the same account. The ticket is single-use,
+    expires in a minute, and the target checks it through /same-account/verify."""
+    rate_limit(req, "sa-ticket", 60)
+    u = security.user_from_token(security.bearer(authorization))
+    if not u or u["kind"] != "client":
+        raise HTTPException(status_code=401, detail="Invalid token")
+    me, target = clip(b.id, 32), clip(b.target, 32)
+    if not me or me != u["device_id"] or not target or target == me:
+        raise HTTPException(status_code=403, detail="not allowed")
+    d = db.one("SELECT user_id FROM devices WHERE id=?", (target,))
+    if not d or d["user_id"] != u["id"]:
+        raise HTTPException(status_code=403, detail="not the same account")
+    t = db.now()
+    db.run("DELETE FROM sd_tickets WHERE created_at<?", (t - TICKET_TTL,))
+    ticket = secrets.token_urlsafe(32)
+    db.run("INSERT INTO sd_tickets(ticket, user_id, from_id, target_id, created_at) VALUES(?,?,?,?,?)",
+           (ticket, u["id"], me, target, t))
+    return {"ticket": ticket, "expires_in": TICKET_TTL}
+
+
+class VerifyReq(BaseModel):
+    ticket: str
+    id: str      # the device being connected to (the caller)
+    peer: str    # the connecting device, as its login request names it
+
+
+@router.post("/same-account/verify")
+def same_account_verify(b: VerifyReq, req: Request):
+    """Called by the device being connected to. The ticket is consumed whatever the outcome; it passes
+    only for this pair of devices, within its lifetime, while the target is still signed in to the
+    account that asked for it."""
+    rate_limit(req, "sa-verify", 60)
+    ticket = clip(b.ticket, 100)
+    r = db.one("SELECT * FROM sd_tickets WHERE ticket=?", (ticket,)) if ticket else None
+    if r:
+        db.run("DELETE FROM sd_tickets WHERE ticket=?", (ticket,))
+    target, peer = clip(b.id, 32), clip(b.peer, 32)
+    d = db.one("SELECT d.user_id, u.name, u.status FROM devices d JOIN users u ON u.id=d.user_id WHERE d.id=?",
+               (target,))
+    ok = bool(r and d and r["created_at"] >= db.now() - TICKET_TTL and r["target_id"] == target
+              and r["from_id"] == peer and d["user_id"] == r["user_id"] and d["status"] == 1)
+    if ok:
+        db.event("connect", f"{d['name']}：{_dev_label(peer)} 以同账号身份免密连接 {_dev_label(target)}")
+    return {"ok": ok}

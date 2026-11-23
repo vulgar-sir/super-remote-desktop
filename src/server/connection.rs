@@ -1518,6 +1518,7 @@ impl Connection {
         self.ip = addr.ip().to_string();
         let mut msg_out = Message::new();
         msg_out.set_hash(self.hash.clone());
+        crate::superdesk::same_account::advertise(&mut msg_out);
         self.send(msg_out).await;
         self.get_api_server();
         let mut audit = json!({
@@ -3063,6 +3064,17 @@ impl Connection {
                     return false;
                 }
                 self.try_start_cm(lr.my_id.clone(), lr.my_name.clone(), self.authorized);
+            } else if let Some(ok) = crate::superdesk::same_account::verify(&self.lr).await {
+                if !ok {
+                    self.send_login_error(crate::client::LOGIN_MSG_PASSWORD_EMPTY)
+                        .await;
+                    self.try_start_cm(lr.my_id, lr.my_name, false);
+                } else {
+                    if !self.send_logon_response_and_keep_alive().await {
+                        return false;
+                    }
+                    self.try_start_cm(lr.my_id, lr.my_name, self.authorized);
+                }
             } else if lr.password.is_empty() {
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
                 if should_use_terminal_os_login_scope(self.terminal, &lr.os_login.username) {

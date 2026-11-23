@@ -205,6 +205,32 @@ check("non-admin token rejected", s == 403, s)
 s, b = call("GET", "/admin/")
 check("admin UI served", s == 200 and "super控制台" in b, b[:100])
 
+# --- same-account login tickets (DEV2 is signed in as smokeuser; DEV is not yet)
+TK = "/api/superdesk/same-account/ticket"
+VF = "/api/superdesk/same-account/verify"
+s, b = call("POST", TK, {"id": DEV2, "target": DEV}, CT)
+check("ticket refused for a device of another account", s == 403, b)
+s, b = call("POST", TK, {"id": DEV, "target": DEV2}, CT)
+check("ticket refused when the token belongs to another device", s == 403, b)
+s, b = call("POST", "/api/login", {"username": "smokeuser", "password": "SmokePass123", "id": DEV, "uuid": "u", "type": "account"})
+CT_DEV = J(b)["access_token"]
+s, b = call("POST", TK, {"id": DEV2, "target": DEV}, CT)
+tk = J(b).get("ticket", "")
+check("ticket issued for a same-account device", s == 200 and len(tk) > 20, b)
+s, b = call("POST", VF, {"ticket": tk, "id": DEV, "peer": "someone-else"})
+check("ticket rejected for another connecting device", J(b) == {"ok": False}, b)
+s, b = call("POST", VF, {"ticket": tk, "id": DEV, "peer": DEV2})
+check("ticket is consumed by a failed check", J(b) == {"ok": False}, b)
+tk = J(call("POST", TK, {"id": DEV2, "target": DEV}, CT)[1])["ticket"]
+s, b = call("POST", VF, {"ticket": tk, "id": DEV, "peer": DEV2})
+check("same-account ticket verifies", J(b) == {"ok": True}, b)
+s, b = call("POST", VF, {"ticket": tk, "id": DEV, "peer": DEV2})
+check("ticket is single-use", J(b) == {"ok": False}, b)
+tk = J(call("POST", TK, {"id": DEV2, "target": DEV}, CT)[1])["ticket"]
+call("POST", "/api/logout", {"id": DEV}, CT_DEV)
+s, b = call("POST", VF, {"ticket": tk, "id": DEV, "peer": DEV2})
+check("ticket rejected after the target signs out", J(b) == {"ok": False}, b)
+
 # --- cleanup
 call("POST", "/api/logout", {"id": DEV2}, CT)
 for hreq in J(call("GET", "/api/admin/help?status=open&size=100", token=AT)[1])["data"]:
