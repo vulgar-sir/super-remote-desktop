@@ -251,8 +251,9 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 | `flutter/android/app/build.gradle`、`AndroidManifest.xml` | 包名 `com.superdesk.remote`（可与官方 RustDesk 共存）、应用名 |
 | 各平台图标 | `superdesk/branding/make_icons.py` 生成 |
 
-`libs/hbb_common` 是 git 子模块：上表中它的两处改动提交在子模块的本地分支 `superdesk`，并另存为
-`superdesk/patches/hbb_common.patch`。在别处重新克隆时（子模块提交不在官方仓库里）执行
+`libs/hbb_common` 是 git 子模块，指向 [vulgar-sir/superdesk-hbb_common](https://github.com/vulgar-sir/superdesk-hbb_common)
+的 `superdesk` 分支（官方 hbb_common + 上表两处改动），`git clone --recurse-submodules` 即可取到。改动另存为
+`superdesk/patches/hbb_common.patch`，也可在官方提交上手动打补丁：
 `git -C libs/hbb_common checkout fae47e024dd8 && git -C libs/hbb_common apply ../../superdesk/patches/hbb_common.patch`。
 
 `APP_NAME`（`SuperDesk` / `SuperDeskHelper`）使客户端被识别为定制客户端：不检查官方更新；
@@ -269,4 +270,5 @@ iwr http://<服务器>:<端口>/download/deploy-superdesk.ps1 -OutFile $env:TEMP
 - 本机若开着 TUN 模式代理（Clash 等），端口探测会出现“假连通”，WebSocket 握手也可能被 HTTP 代理破坏；`check-p2p-ports.py` 已用服务器抓包规避。
 - 访问策略中的“工作时间/公司账号”基于 RustDesk 的 ID 白名单实现，被拒绝的一方会看到“Your ID is blocked by the peer”。
 - 设备 ID 由机器硬件标识计算：同一台电脑上同时运行完整版和员工助手会得到相同 ID、互相顶掉注册（正常部署一台电脑只装一个版本）。
-- 许可证：RustDesk 为 AGPL-3.0。仅公司内部使用无需公开源码；若对外分发修改后的客户端，须同时提供源码。
+- 许可证：本项目与 RustDesk 相同，为 AGPL-3.0（见根目录 `LICENCE`、`NOTICE.md`）。分发修改后的客户端时须同时提供源码，
+  本仓库即为对应源码。

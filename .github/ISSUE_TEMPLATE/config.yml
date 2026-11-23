@@ -1,8 +1,5 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
-  - name: Feature Request
-    url: https://github.com/rustdesk/rustdesk/discussions/categories/feature-request
-    about: Discuss ideas for new features or enhancements, it will be converted to GitHub issue when we commit to building those changes or are helping a community member contribute their own changes
-  - name: Ask a question
-    url: https://github.com/rustdesk/rustdesk/discussions/category_choices
-    about: Ask questions and discuss with other community members.
+  - name: 使用说明 / Documentation
+    url: https://github.com/vulgar-sir/super-remote-desktop/blob/superdesk/superdesk/README.md
+    about: super远程桌面 是 RustDesk 的非官方修改版，请在本仓库提问，不要到 RustDesk 官方仓库反馈。This is an unofficial RustDesk fork; please do not report its issues to the RustDesk project.
